@@ -187,7 +187,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div style="padding:6px 8px;">
     <input class="search-input" id="searchInput" placeholder="Search..." oninput="onSearch()" style="width:100%;">
   </div>
-  <div class="folder-tree" id="folderTree" oncontextmenu="rootFolderContext(event)"></div>
+  <div class="folder-tree" id="folderTree" oncontextmenu="rootFolderContext(event)" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,null)"></div>
   <div class="stats" id="stats">0 notes</div>
 </div>
 
@@ -483,9 +483,9 @@ var dragNoteId=null;
 function dragStart(e,id){dragNoteId=id;e.target.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",id);}
 function dragEnd(e){dragNoteId=null;document.querySelectorAll(".dragging,.drag-over").forEach(function(el){el.classList.remove("dragging");el.classList.remove("drag-over");});}
 function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect="move";}
-function dragEnter(e){e.preventDefault();e.target.closest(".drop-target")?.classList.add("drag-over");}
-function dragLeave(e){e.target.closest(".drop-target")?.classList.remove("drag-over");}
-function dropNote(e,folderId){e.preventDefault();e.target.closest(".drop-target")?.classList.remove("drag-over");if(dragNoteId){moveNoteTo(folderId,dragNoteId);dragNoteId=null;}}
+function dragEnter(e){e.preventDefault();var el=e.target.closest(".drop-target")||e.target.closest("#folderTree");if(el)el.classList.add("drag-over");}
+function dragLeave(e){var el=e.target.closest(".drop-target")||e.target.closest("#folderTree");if(el)el.classList.remove("drag-over");}
+function dropNote(e,folderId){e.preventDefault();e.stopPropagation();e.target.closest(".drop-target")?.classList.remove("drag-over");document.getElementById("folderTree")?.classList.remove("drag-over");if(dragNoteId){moveNoteTo(folderId,dragNoteId);dragNoteId=null;}}
 
 async function deleteCurrentNote(){if(!currentNoteId||!db)return;if(!confirm("Delete this note permanently?"))return;
   await dbDelete("notes",currentNoteId);currentNoteId=null;clearEditor();refreshFolderTree();showToast("Deleted");}
