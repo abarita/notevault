@@ -1,0 +1,23 @@
+{
+  "name": "note",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abarita/notevault.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/abarita/notevault/issues"
+  },
+  "homepage": "https://github.com/abarita/notevault#readme",
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}
