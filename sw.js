@@ -2,7 +2,8 @@ var CACHE_NAME="notevault-v1";
 var CACHE_URLS=[
   "./",
   "./index.html",
-  "https://cdn.jsdelivr.net/npm/marked/marked.min.js"
+  "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
+  "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
 ];
 
 self.addEventListener("install",function(e){

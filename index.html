@@ -7,6 +7,7 @@
 <meta name="color-scheme" content="dark light">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22NoteVault%22%2C%22short_name%22%3A%22NoteVault%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231e1e2e%22%2C%22theme_color%22%3A%22%231e1e2e%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%253Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%23282840'%2F%3E%253Ctext%20x%3D'50'%20y%3D'65'%20text-anchor%3D'middle'%20font-size%3D'50'%20fill%3D'%2389b4fa'%20font-family%3D'sans-serif'%3EN%253C%2Ftext%3E%253C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <style>
 :root, [data-theme="dark"] {
   --bg: #1e1e2e; --surface: #282840; --surface2: #313150; --surface3: #3a3a5c;
@@ -92,6 +93,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .xml-key { color: var(--json-key); } .xml-string { color: var(--json-string); }
 .xml-bracket { color: var(--json-bracket); } .xml-attr { color: var(--warning); }
 .text-block { white-space: pre-wrap; font-family: inherit; }
+.mermaid-rendered { overflow-x: auto; padding: 16px 0; display: flex; justify-content: center; }
+.mermaid-rendered svg { max-width: 100%; }
 .json-tree { font-family: 'Cascadia Code','Fira Code','Consolas',monospace; font-size: 13px; }
 .json-node { padding-left: 20px; }
 .json-line { display: flex; align-items: flex-start; min-height: 22px; line-height: 1.6; }
@@ -167,13 +170,14 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <h1>NoteVault</h1>
     <div style="display:flex;gap:4px;">
       <button class="btn-icon" onclick="openSettings()" title="Settings">&#9881;</button>
+      <button class="btn btn-sm btn-ghost" onclick="createRootFolder()" title="New folder">&#128193;+</button>
       <button class="btn btn-sm" onclick="createNote()">+ New</button>
     </div>
   </div>
   <div style="padding:6px 8px;">
     <input class="search-input" id="searchInput" placeholder="Search..." oninput="onSearch()" style="width:100%;">
   </div>
-  <div class="folder-tree" id="folderTree"></div>
+  <div class="folder-tree" id="folderTree" oncontextmenu="rootFolderContext(event)"></div>
   <div class="stats" id="stats">0 notes</div>
 </div>
 
@@ -226,7 +230,12 @@ var BIP39=["abandon","ability","able","about","above","absent","absorb","abstrac
 // === STATE ===
 var db=null,currentNoteId=null,currentFolderId=null,saveTimer=null,expandedFolders=new Set();
 var recoveryKey=null,passphraseKey=null,githubToken=null,gistId=null,syncEnabled=false;
-var isLocked=true,searchQuery="",autoSyncTimer=null;
+var isLocked=true,searchQuery="",autoSyncTimer=null,mermaidReady=false;
+
+// === MERMAID ===
+function initMermaid(){if(typeof mermaid!=="undefined"&&!mermaidReady){mermaid.initialize({startOnLoad:false,theme:document.documentElement.getAttribute("data-theme")==="dark"?"dark":"default",securityLevel:"loose"});mermaidReady=true;}}
+async function renderMermaidDiagrams(){if(typeof mermaid==="undefined")return;initMermaid();var blocks=document.querySelectorAll(".preview-content pre code.language-mermaid");for(var i=0;i<blocks.length;i++){var block=blocks[i];var parent=block.parentElement;if(parent.querySelector(".mermaid-rendered"))continue;try{var id="mermaid-"+i+"-"+Date.now();var result=await mermaid.render(id,block.textContent);var wrapper=document.createElement("div");wrapper.className="mermaid-rendered";wrapper.innerHTML=result.svg;parent.parentElement.replaceChild(wrapper,parent);}catch(e){var errDiv=document.createElement("div");errDiv.style.cssText="color:var(--danger);font-size:12px;padding:4px 0;";errDiv.textContent="Mermaid: "+e.message;parent.parentElement.insertBefore(errDiv,parent);}}}
+function updateMermaidTheme(){if(typeof mermaid!=="undefined"&&mermaidReady){mermaid.initialize({startOnLoad:false,theme:document.documentElement.getAttribute("data-theme")==="dark"?"dark":"default",securityLevel:"loose"});var rendered=document.querySelectorAll(".mermaid-rendered");if(rendered.length>0){var preview=document.getElementById("preview");var content=document.getElementById("editor").value;var fs=document.getElementById("formatSelect").value;var format=fs==="auto"?detectFormat(content):fs;if(format==="markdown"){preview.innerHTML=renderContent(content,format);renderMermaidDiagrams();}}}}
 
 // === DATABASE ===
 function openDB(){return new Promise(function(r,j){var req=indexedDB.open("NoteVaultDB",2);req.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("notes")){var s=d.createObjectStore("notes",{keyPath:"id"});s.createIndex("folderId","folderId",{unique:false});s.createIndex("updatedAt","updatedAt",{unique:false});}else{var ns=e.target.transaction.objectStore("notes");if(!ns.indexNames.contains("folderId"))ns.createIndex("folderId","folderId",{unique:false});if(!ns.indexNames.contains("updatedAt"))ns.createIndex("updatedAt","updatedAt",{unique:false});}if(!d.objectStoreNames.contains("folders")){var s2=d.createObjectStore("folders",{keyPath:"id"});s2.createIndex("parentId","parentId",{unique:false});}if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"key"});};req.onsuccess=function(e){db=e.target.result;r(db);};req.onerror=function(e){j(e.target.error);};});}
@@ -310,7 +319,7 @@ function renderNode(parent,val,path,isRoot){var line=document.createElement("div
     wrapper2.appendChild(header2);wrapper2.appendChild(childrenDiv2);parent.appendChild(wrapper2);return;}
   line.innerHTML='<span>'+escapeHtml(String(val))+'</span>';parent.appendChild(line);}
 
-function renderContent(content,format){if(format==="markdown"){marked.setOptions({breaks:true,gfm:true});return marked.parse(content);}
+function renderContent(content,format){if(format==="markdown"){if(typeof marked!=="undefined"){try{marked.use({breaks:true,gfm:true});}catch(e){try{marked.setOptions({breaks:true,gfm:true});}catch(e2){}}return marked.parse(content);}return"<pre>"+escapeHtml(content)+"</pre>";}
   if(format==="json"){try{var parsed=JSON.parse(content);var tree=renderJSONTree(parsed);return tree.outerHTML;}catch(_){return '<pre><code>'+escapeHtml(content)+'</code></pre>';}}
   if(format==="xml")return'<pre><code>'+highlightXML(content)+'</code></pre>';
   return'<pre class="text-block">'+escapeHtml(content)+'</pre>';}
@@ -321,6 +330,7 @@ function updatePreview(){var content=document.getElementById("editor").value;var
   if(!content.trim()&&!currentNoteId){preview.innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';detected.textContent="";return;}
   var actualFormat=fs==="auto"?detectFormat(content):fs;detected.textContent="Detected: "+actualFormat;
   preview.innerHTML=renderContent(content,actualFormat);
+  if(actualFormat==="markdown")renderMermaidDiagrams();
   document.getElementById("charCount").textContent=content.length+" chars";}
 
 function onEditorInput(){updatePreview();if(currentNoteId)scheduleSave();}
@@ -402,6 +412,10 @@ function folderContext(e,id){e.preventDefault();showContextMenu(e,[
   {label:"Move",action:function(){moveFolder(id);}},
   {label:"Delete",action:function(){deleteFolder(id);},danger:true}
 ]);}
+function rootFolderContext(e){e.preventDefault();showContextMenu(e,[
+  {label:"New folder",action:function(){createRootFolder();}},
+  {label:"New note",action:function(){createNote();}}
+]);}
 function noteContext(e,id){e.preventDefault();showContextMenu(e,[
   {label:"Delete note",action:function(){currentNoteId=id;deleteCurrentNote();},danger:true}
 ]);}
@@ -437,7 +451,8 @@ function onSearch(){searchQuery=document.getElementById("searchInput").value;ref
 function toggleTheme(){var html=document.documentElement;var current=html.getAttribute("data-theme");
   var next=current==="dark"?"light":"dark";html.setAttribute("data-theme",next);
   document.getElementById("themeBtn").innerHTML=next==="dark"?"&#9788;":"&#9790;";
-  dbPut("settings",{key:"theme",value:next}).catch(function(){});}
+  dbPut("settings",{key:"theme",value:next}).catch(function(){});
+  updateMermaidTheme();}
 
 async function initTheme(){var s=await dbGet("settings","theme");
   if(s&&s.value){document.documentElement.setAttribute("data-theme",s.value);
