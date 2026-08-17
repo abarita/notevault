@@ -230,7 +230,7 @@ var BIP39=["abandon","ability","able","about","above","absent","absorb","abstrac
 // === STATE ===
 var db=null,currentNoteId=null,currentFolderId=null,saveTimer=null,expandedFolders=new Set();
 var recoveryKey=null,passphraseKey=null,githubToken=null,gistId=null,syncEnabled=false;
-var isLocked=true,searchQuery="",autoSyncTimer=null,mermaidReady=false;
+var isLocked=true,searchQuery="",autoSyncTimer=null,mermaidReady=false,syncInProgress=false;
 
 // === MERMAID ===
 function initMermaid(){if(typeof mermaid!=="undefined"&&!mermaidReady){mermaid.initialize({startOnLoad:false,theme:document.documentElement.getAttribute("data-theme")==="dark"?"dark":"default",securityLevel:"loose"});mermaidReady=true;}}
@@ -417,6 +417,7 @@ function rootFolderContext(e){e.preventDefault();showContextMenu(e,[
   {label:"New note",action:function(){createNote();}}
 ]);}
 function noteContext(e,id){e.preventDefault();showContextMenu(e,[
+  {label:"Rename",action:function(){currentNoteId=id;renameNote();}},
   {label:"Delete note",action:function(){currentNoteId=id;deleteCurrentNote();},danger:true}
 ]);}
 function showContextMenu(e,items){var menu=document.getElementById("contextMenu");
@@ -432,11 +433,16 @@ async function loadNote(id){currentNoteId=id;var note=await dbGet("notes",id);if
 
 async function saveCurrentNote(){if(!currentNoteId||!db)return;var content=document.getElementById("editor").value;
   var format=document.getElementById("formatSelect").value;
-  var title=content.split("\n")[0].replace(/^#+\s*/,"").trim().substring(0,80)||"Untitled";
+  var autoTitle=content.split("\n")[0].replace(/^#+\s*/,"").trim().substring(0,80)||"Untitled";
   var existing=await dbGet("notes",currentNoteId);
+  var title=existing&&existing.customTitle?existing.title:autoTitle;
   var note={id:currentNoteId,folderId:existing?existing.folderId:currentFolderId,title:title,content:content,format:format,
-    createdAt:existing?existing.createdAt:Date.now(),updatedAt:Date.now()};
+    customTitle:existing?existing.customTitle||false:false,createdAt:existing?existing.createdAt:Date.now(),updatedAt:Date.now()};
   await dbPut("notes",note);refreshFolderTree();}
+
+async function renameNote(){if(!currentNoteId)return;var note=await dbGet("notes",currentNoteId);if(!note)return;
+  var name=prompt("Rename note:",note.title);if(!name||!name.trim())return;
+  note.title=name.trim();note.customTitle=true;note.updatedAt=Date.now();await dbPut("notes",note);refreshFolderTree();showToast("Renamed");}
 
 async function deleteCurrentNote(){if(!currentNoteId||!db)return;if(!confirm("Delete this note permanently?"))return;
   await dbDelete("notes",currentNoteId);currentNoteId=null;clearEditor();refreshFolderTree();showToast("Deleted");}
@@ -657,7 +663,8 @@ async function changePassphrase(){var pw=prompt("Enter current passphrase:");if(
 
 // === GITHUB GIST SYNC ===
 async function manualSync(){if(!githubToken){showToast("Set up GitHub token in Settings first",true);return;}
-  if(!gistId){await firstSync();}else{await syncToGist();}}
+  syncInProgress=true;updateSyncIndicator();
+  try{if(!gistId){await firstSync();}else{await syncToGist();}}finally{syncInProgress=false;updateSyncIndicator();}}
 
 async function firstSync(){var vault=await getVaultJSON();var plaintext=JSON.stringify(vault);
   var encrypted=await encryptAES(recoveryKey,plaintext);
@@ -697,8 +704,11 @@ async function mergeVault(vault){if(!vault||!vault.folders||!vault.notes)return;
   await refreshFolderTree();}
 
 function updateSyncIndicator(){var dot=document.querySelector("#syncIndicator .sync-dot");var label=document.getElementById("syncLabel");
+  if(!dot||!label)return;
+  if(syncInProgress){dot.className="sync-dot syncing";label.textContent="Syncing...";return;}
   if(!githubToken||!gistId){dot.className="sync-dot never";label.textContent="Offline";return;}
-  if(syncEnabled){dot.className="sync-dot synced";label.textContent="Auto";}else{dot.className="sync-dot never";label.textContent="Manual";}}
+  if(syncEnabled){dot.className="sync-dot synced";label.textContent="Auto";}else{dot.className="sync-dot never";label.textContent="Manual";}
+  dbGet("settings","last_synced_at").then(function(s){if(s&&s.value){var ago=Math.round((Date.now()-s.value)/60000);label.textContent=(syncEnabled?"Auto":"Manual")+" \u00B7 "+(ago<1?"just now":ago+"m ago");}}).catch(function(){});}
 
 // === SETTINGS ===
 async function openSettings(){var modal=document.getElementById("modalContainer");
