@@ -515,8 +515,8 @@ async function showSetup(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
     '<h2>Set up NoteVault</h2>'+
     '<p>Create a passphrase to encrypt your notes. Choose something memorable but strong.</p>'+
-    '<input type=password id=setupPassphrase placeholder="Enter passphrase" autocomplete="new-password">'+
-    '<input type=password id=setupPassphraseConfirm placeholder="Confirm passphrase">'+
+    '<input type=password id=setupPassphrase placeholder="Enter passphrase" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')document.getElementById(\'setupPassphraseConfirm\').focus()">'+
+    '<input type=password id=setupPassphraseConfirm placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')startSetup()">'+
     '<div id=setupError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
     '<div class=modal-actions>'+
     '<button class="btn btn-ghost" onclick="document.getElementById(\'modalContainer\').innerHTML=\'\'">Cancel</button>'+
@@ -555,7 +555,7 @@ function verifyRecoveryWords(){var modal=document.getElementById("modalContainer
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:480px;">'+
     '<h2>Verify Recovery Key</h2>'+
     '<p>Enter the 12 recovery words in order to verify you\'ve saved them correctly.</p>'+
-    '<textarea id=verifyWords rows=4 placeholder="Enter all 12 words separated by spaces"></textarea>'+
+    '<textarea id=verifyWords rows=4 placeholder="Enter all 12 words separated by spaces" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();doVerifyRecovery()}"></textarea>'+
     '<div id=verifyError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
     '<div class=modal-actions>'+
     '<button class="btn btn-ghost" onclick="skipVerify()">Skip</button>'+
@@ -579,7 +579,7 @@ async function showUnlock(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal>'+
     '<h2>Unlock NoteVault</h2>'+
     '<p>Enter your passphrase to unlock your notes.</p>'+
-    '<input type=password id=unlockPassphrase placeholder="Enter passphrase" autocomplete="current-password">'+
+    '<input type=password id=unlockPassphrase placeholder="Enter passphrase" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doUnlock()">'+
     '<div id=unlockError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
     '<div class=modal-actions>'+
     '<button class="btn btn-ghost" onclick="showRecovery()">Forgot passphrase?</button>'+
@@ -606,7 +606,7 @@ async function showRecovery(){var modal=document.getElementById("modalContainer"
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
     '<h2>Recover Your Notes</h2>'+
     '<p>Enter your 12 recovery words to regain access.</p>'+
-    '<textarea id=recoveryInput rows=4 placeholder="Enter all 12 words separated by spaces"></textarea>'+
+    '<textarea id=recoveryInput rows=4 placeholder="Enter all 12 words separated by spaces" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();doRecovery()}"></textarea>'+
     '<div id=recoveryError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
     '<div class=modal-actions>'+
     '<button class="btn btn-ghost" onclick="showUnlock()">Back</button>'+
@@ -624,8 +624,8 @@ function showNewPassphrase(){var modal=document.getElementById("modalContainer")
   modal.innerHTML='<div class=modal-overlay><div class=modal>'+
     '<h2>Set New Passphrase</h2>'+
     '<p>Recovery successful! Set a new passphrase.</p>'+
-    '<input type=password id=newPassphrase placeholder="New passphrase">'+
-    '<input type=password id=newPassphraseConfirm placeholder="Confirm new passphrase">'+
+    '<input type=password id=newPassphrase placeholder="New passphrase" onkeydown="if(event.key===\'Enter\')document.getElementById(\'newPassphraseConfirm\').focus()">'+
+    '<input type=password id=newPassphraseConfirm placeholder="Confirm new passphrase" onkeydown="if(event.key===\'Enter\')setNewPassphrase()">'+
     '<div id=newPassError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
     '<div class=modal-actions>'+
     '<button class=btn onclick="setNewPassphrase()">Save</button>'+
