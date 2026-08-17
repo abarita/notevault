@@ -443,6 +443,23 @@ function showContextMenu(e,items){var menu=document.getElementById("contextMenu"
   var els=menu.querySelectorAll(".context-menu-item");for(var i=0;i<els.length;i++){(function(idx){var el=els[i];el.onclick=function(ev){ev.stopPropagation();menu.style.display="none";items[idx].action();};})(parseInt(el.getAttribute("data-idx")));}
   setTimeout(function(){closeMenuListener=function(ev){if(ev.button===0)menu.style.display="none";};document.addEventListener("click",closeMenuListener);},100);}
 
+// === SELF-TEST (run from console: _testContextMenu()) ===
+function _testContextMenu(){var results=[];function ok(cond,msg){results.push({pass:!!cond,msg:msg});}
+  var menu=document.getElementById("contextMenu");ok(menu,"contextMenu div exists");
+  var actionCalled=false;var testItems=[{label:"Test Item",action:function(){actionCalled=true;}},{label:"Test Item 2",action:function(){}}];
+  var fakeEvent={clientX:100,clientY:200,preventDefault:function(){}};
+  showContextMenu(fakeEvent,testItems);
+  ok(menu.style.display==="block","menu is displayed");
+  ok(menu.querySelectorAll(".context-menu-item").length===2,"2 items rendered");
+  ok(menu.querySelector(".context-menu-item").textContent==="Test Item","first item label correct");
+  var firstItem=menu.querySelector(".context-menu-item");firstItem.click();
+  ok(actionCalled,"click action was called");
+  ok(menu.style.display==="none","menu closed after click");
+  menu.style.display="none";
+  console.table(results);var pass=results.filter(function(r){return r.pass;}).length;
+  console.log(pass+"/"+results.length+" passed"+(pass===results.length?"":" — "+(results.length-pass)+" FAILED"));
+  return pass===results.length;}
+
 // === NOTE OPERATIONS ===
 async function loadNote(id){currentNoteId=id;var note=await dbGet("notes",id);if(!note)return;
   document.getElementById("editor").value=note.content;document.getElementById("formatSelect").value=note.format;
