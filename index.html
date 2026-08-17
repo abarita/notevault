@@ -53,6 +53,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .tree-arrow { width: 18px; text-align: center; color: var(--text3); font-size: 10px; flex-shrink: 0; cursor: pointer; min-height: 24px; display: flex; align-items: center; justify-content: center; }
 .tree-arrow:hover { color: var(--text); }
 .tree-icon { opacity: 0.6; font-size: 14px; flex-shrink: 0; }
+.tree-item.drag-over { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.tree-item.dragging { opacity: 0.4; }
 .tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-time { display: block; font-size: 10px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .tree-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface3); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); flex-shrink: 0; }
@@ -361,7 +363,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
     children.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(f){var cid=f.id;var isExp=expandedFolders.has(cid);
       var childCount=folders.filter(function(cf){return cf.parentId===cid;}).length;
       var hasChildren=childCount>0;var noteCount=noteCounts[cid]||0;
-      html+='<div class=tree-item id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="selectFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')">'+
+      html+='<div class="tree-item drop-target" id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="selectFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
         '<span class=tree-arrow onclick="event.stopPropagation();toggleFolder(\''+cid+'\')">'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
         '<span class=tree-icon>'+(isExp?"\uD83D\uDCC2":"\uD83D\uDCC1")+'</span>'+
         '<span class=tree-name>'+escapeHtml(f.name)+'</span>'+
@@ -374,7 +376,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
       html+='<div class="tree-children'+(isExp?"":" collapsed")+'" id=tree-children-'+cid+'>'+childHtml+'</div>';
     });
     folderNotes.sort(function(a,b){return b.updatedAt-a.updatedAt;}).forEach(function(n){var fmt=n.format==="auto"?detectFormat(n.content):n.format;
-      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id=tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')">'+
+      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id=tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')" draggable="true" ondragstart="dragStart(event,\''+n.id+'\')" ondragend="dragEnd(event)">'+
         '<span class=tree-arrow></span>'+
         '<span class=tree-icon>\uD83D\uDCC4</span>'+
         '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'<span class=tree-time>created '+timeAgo(n.createdAt)+' · updated '+timeAgo(n.updatedAt)+'</span></span>'+
@@ -473,9 +475,17 @@ async function showMoveNoteModal(){var folders=await dbGetAll("folders");var not
     '<button class="btn btn-ghost" onclick="document.getElementById(\'modalContainer\').innerHTML=\'\'">Cancel</button>'+
     '</div></div></div>';}
 
-async function moveNoteTo(folderId){if(!currentNoteId)return;var note=await dbGet("notes",currentNoteId);if(!note)return;
+async function moveNoteTo(folderId,noteId){var nid=noteId||currentNoteId;if(!nid)return;var note=await dbGet("notes",nid);if(!note)return;
   note.folderId=folderId||null;note.updatedAt=Date.now();await dbPut("notes",note);
   document.getElementById("modalContainer").innerHTML="";refreshFolderTree();showToast("Moved");}
+
+var dragNoteId=null;
+function dragStart(e,id){dragNoteId=id;e.target.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",id);}
+function dragEnd(e){dragNoteId=null;document.querySelectorAll(".dragging,.drag-over").forEach(function(el){el.classList.remove("dragging");el.classList.remove("drag-over");});}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect="move";}
+function dragEnter(e){e.preventDefault();e.target.closest(".drop-target")?.classList.add("drag-over");}
+function dragLeave(e){e.target.closest(".drop-target")?.classList.remove("drag-over");}
+function dropNote(e,folderId){e.preventDefault();e.target.closest(".drop-target")?.classList.remove("drag-over");if(dragNoteId){moveNoteTo(folderId,dragNoteId);dragNoteId=null;}}
 
 async function deleteCurrentNote(){if(!currentNoteId||!db)return;if(!confirm("Delete this note permanently?"))return;
   await dbDelete("notes",currentNoteId);currentNoteId=null;clearEditor();refreshFolderTree();showToast("Deleted");}
