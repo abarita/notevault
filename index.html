@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NoteVault</title>
+<meta name="color-scheme" content="dark light">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22NoteVault%22%2C%22short_name%22%3A%22NoteVault%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231e1e2e%22%2C%22theme_color%22%3A%22%231e1e2e%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%253Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%23282840'%2F%3E%253Ctext%20x%3D'50'%20y%3D'65'%20text-anchor%3D'middle'%20font-size%3D'50'%20fill%3D'%2389b4fa'%20font-family%3D'sans-serif'%3EN%253C%2Ftext%3E%253C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root, [data-theme="dark"] {
+  --bg: #1e1e2e; --surface: #282840; --surface2: #313150; --surface3: #3a3a5c;
+  --text: #cdd6f4; --text2: #a6adc8; --text3: #6c7086;
+  --accent: #89b4fa; --accent2: #b4befe; --border: #45475a;
+  --danger: #f38ba8; --green: #a6e3a1; --warning: #f9e2af; --orange: #fab387;
+  --json-key: #89b4fa; --json-string: #a6e3a1; --json-number: #fab387;
+  --json-bool: #cba6f7; --json-null: #6c7086; --json-bracket: #6c7086;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --overlay: rgba(0,0,0,0.5);
+}
+[data-theme="light"] {
+  --bg: #f5f5f9; --surface: #ffffff; --surface2: #f0f0f5; --surface3: #e5e5ee;
+  --text: #1e1e2e; --text2: #585b70; --text3: #9ca0b0;
+  --accent: #1e66f5; --accent2: #2e7af9; --border: #d0d0da;
+  --danger: #d20f39; --green: #40a02b; --warning: #df8e1d; --orange: #fe640b;
+  --json-key: #1e66f5; --json-string: #40a02b; --json-number: #fe640b;
+  --json-bool: #8839ef; --json-null: #9ca0b0; --json-bracket: #9ca0b0;
+  --shadow: 0 2px 12px rgba(0,0,0,0.1);
+  --overlay: rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; overflow: hidden; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.sidebar { width: 300px; min-width: 300px; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border); z-index: 10; transition: transform 0.25s ease; }
+.sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sidebar-header h1 { font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.btn { background: var(--accent); color: var(--bg); border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; white-space: nowrap; min-height: 36px; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
+.btn:hover { opacity: 0.85; }
+.btn:active { opacity: 0.7; }
+.btn-sm { padding: 5px 10px; font-size: 12px; min-height: 30px; }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-danger { background: var(--danger); }
+.btn-icon { background: transparent; border: none; color: var(--text2); cursor: pointer; padding: 4px 6px; border-radius: 4px; font-size: 15px; line-height: 1; min-height: 30px; min-width: 30px; display: inline-flex; align-items: center; justify-content: center; }
+.btn-icon:hover { background: var(--surface2); color: var(--text); }
+.folder-tree { flex: 1; overflow-y: auto; padding: 8px 4px; }
+.tree-item { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; transition: background 0.1s; gap: 4px; font-size: 13px; user-select: none; border: 1px solid transparent; margin: 1px 0; min-height: 36px; }
+.tree-item:hover { background: var(--surface2); }
+.tree-item.active { background: var(--surface2); border-color: var(--accent); }
+.tree-arrow { width: 18px; text-align: center; color: var(--text3); font-size: 10px; flex-shrink: 0; cursor: pointer; min-height: 24px; display: flex; align-items: center; justify-content: center; }
+.tree-arrow:hover { color: var(--text); }
+.tree-icon { opacity: 0.6; font-size: 14px; flex-shrink: 0; }
+.tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface3); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); flex-shrink: 0; }
+.tree-actions { display: none; gap: 2px; flex-shrink: 0; }
+.tree-item:hover .tree-actions { display: flex; }
+.tree-children { padding-left: 16px; }
+.tree-children.collapsed { display: none; }
+.context-menu { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; z-index: 1000; box-shadow: var(--shadow); min-width: 160px; display: none; }
+.context-menu-item { padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+.context-menu-item:hover { background: var(--surface2); }
+.context-menu-item.danger { color: var(--danger); }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.toolbar { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--surface); min-height: 48px; }
+.toolbar select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: inherit; min-height: 34px; }
+.toolbar select:focus { outline: none; border-color: var(--accent); }
+.toolbar-spacer { flex: 1; }
+.content-area { flex: 1; display: flex; min-height: 0; }
+.editor-pane, .preview-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.editor-pane { border-right: 1px solid var(--border); }
+.pane-header { padding: 6px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); border-bottom: 1px solid var(--border); background: var(--surface); display: flex; justify-content: space-between; align-items: center; min-height: 30px; }
+.editor-pane textarea { flex: 1; background: var(--bg); color: var(--text); border: none; padding: 16px; font-family: 'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace; font-size: 14px; line-height: 1.65; resize: none; outline: none; tab-size: 2; }
+.preview-content { flex: 1; overflow-y: auto; padding: 16px; line-height: 1.7; }
+.preview-content h1,.preview-content h2,.preview-content h3 { color: var(--accent); margin: 16px 0 8px; }
+.preview-content h1 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.preview-content h2 { font-size: 18px; }
+.preview-content h3 { font-size: 15px; }
+.preview-content p { margin: 8px 0; }
+.preview-content a { color: var(--accent2); }
+.preview-content code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-family: 'Cascadia Code','Fira Code','Consolas',monospace; font-size: 13px; }
+.preview-content pre { background: var(--surface); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; border: 1px solid var(--border); }
+.preview-content pre code { background: none; padding: 0; }
+.preview-content blockquote { border-left: 3px solid var(--accent); padding-left: 16px; color: var(--text2); margin: 12px 0; }
+.preview-content table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.preview-content th,.preview-content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+.preview-content th { background: var(--surface); }
+.preview-content ul,.preview-content ol { padding-left: 24px; margin: 8px 0; }
+.preview-content li { margin: 4px 0; }
+.preview-content hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.xml-key { color: var(--json-key); } .xml-string { color: var(--json-string); }
+.xml-bracket { color: var(--json-bracket); } .xml-attr { color: var(--warning); }
+.text-block { white-space: pre-wrap; font-family: inherit; }
+.json-tree { font-family: 'Cascadia Code','Fira Code','Consolas',monospace; font-size: 13px; }
+.json-node { padding-left: 20px; }
+.json-line { display: flex; align-items: flex-start; min-height: 22px; line-height: 1.6; }
+.json-toggle { cursor: pointer; width: 16px; flex-shrink: 0; color: var(--text3); user-select: none; font-size: 11px; text-align: center; margin-right: 2px; }
+.json-toggle:hover { color: var(--text); }
+.json-key-name { color: var(--json-key); margin-right: 4px; flex-shrink: 0; }
+.json-colon { margin-right: 4px; color: var(--text3); }
+.json-val-string { color: var(--json-string); }
+.json-val-number { color: var(--json-number); }
+.json-val-bool { color: var(--json-bool); }
+.json-val-null { color: var(--json-null); font-style: italic; }
+.json-bracket { color: var(--json-bracket); }
+.json-preview { color: var(--text3); font-style: italic; cursor: pointer; }
+.json-copy-path { opacity: 0; font-size: 10px; color: var(--text3); cursor: pointer; margin-left: 4px; padding: 0 4px; border-radius: 3px; flex-shrink: 0; }
+.json-line:hover .json-copy-path { opacity: 1; }
+.json-copy-path:hover { background: var(--surface2); color: var(--accent); }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); text-align: center; padding: 32px; }
+.empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+.empty-state h2 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+.empty-state p { font-size: 14px; max-width: 400px; }
+.stats { padding: 10px 16px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border); }
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: var(--bg); padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.2s; pointer-events: none; z-index: 200; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.error { background: var(--danger); }
+.hamburger { display: none; background: none; border: none; color: var(--text); cursor: pointer; font-size: 22px; padding: 4px 8px; border-radius: 6px; min-height: 40px; min-width: 40px; align-items: center; justify-content: center; }
+.hamburger:hover { background: var(--surface2); }
+.modal-overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: var(--surface); border-radius: 12px; padding: 24px; max-width: 480px; width: 100%; box-shadow: var(--shadow); border: 1px solid var(--border); }
+.modal h2 { font-size: 18px; margin-bottom: 12px; color: var(--accent); }
+.modal p { font-size: 14px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+.modal input[type="text"], .modal input[type="password"], .modal textarea { width: 100%; padding: 10px 14px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: 'Cascadia Code','Fira Code','Consolas',monospace; outline: none; }
+.modal input:focus, .modal textarea:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.recovery-words { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 16px 0; }
+.recovery-word { background: var(--surface2); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: 'Cascadia Code','Fira Code','Consolas',monospace; text-align: center; border: 1px solid var(--border); }
+.recovery-word .index { font-size: 10px; color: var(--text3); display: block; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.settings-row label { color: var(--text2); }
+.sync-indicator { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; }
+.sync-dot.synced { background: var(--green); }
+.sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
+.sync-dot.error { background: var(--danger); }
+.sync-dot.never { background: var(--text3); }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.search-input { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 6px; font-size: 13px; width: 140px; outline: none; font-family: inherit; }
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text3); }
+@media (max-width: 768px) {
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 50; transform: translateX(-100%); width: 85vw; max-width: 320px; }
+  .sidebar.open { transform: translateX(0); }
+  .hamburger { display: flex; }
+  .content-area { flex-direction: column; }
+  .editor-pane { border-right: none; border-bottom: 1px solid var(--border); flex: none; height: 45%; }
+  .preview-pane { flex: 1; }
+  .toolbar { gap: 4px; padding: 6px 10px; }
+  .toolbar select { font-size: 12px; padding: 4px 8px; min-height: 30px; }
+  .btn-sm { padding: 4px 8px; font-size: 11px; min-height: 28px; }
+  .search-input { width: 100px; font-size: 12px; }
+  .recovery-words { grid-template-columns: repeat(2,1fr); }
+  .modal { padding: 16px; }
+}
+.mobile-backdrop { display: none; position: fixed; inset: 0; background: var(--overlay); z-index: 49; }
+@media (max-width: 768px) { .mobile-backdrop.open { display: block; } }
+</style>
+</head>
+<body>
+
+<div class="mobile-backdrop" id="mobileBackdrop" onclick="closeSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h1>NoteVault</h1>
+    <div style="display:flex;gap:4px;">
+      <button class="btn-icon" onclick="openSettings()" title="Settings">&#9881;</button>
+      <button class="btn btn-sm" onclick="createNote()">+ New</button>
+    </div>
+  </div>
+  <div style="padding:6px 8px;">
+    <input class="search-input" id="searchInput" placeholder="Search..." oninput="onSearch()" style="width:100%;">
+  </div>
+  <div class="folder-tree" id="folderTree"></div>
+  <div class="stats" id="stats">0 notes</div>
+</div>
+
+<div class="main">
+  <div class="toolbar">
+    <button class="hamburger" onclick="toggleSidebar()" title="Menu">&#9776;</button>
+    <select id="formatSelect" onchange="onFormatChange()">
+      <option value="auto">Auto-detect</option>
+      <option value="text">Plain Text</option>
+      <option value="markdown">Markdown</option>
+      <option value="json">JSON</option>
+      <option value="xml">XML</option>
+    </select>
+    <button class="btn btn-sm btn-ghost" id="syncBtn" onclick="manualSync()" title="Sync to Gist">&#8645; Sync</button>
+    <button class="btn btn-sm btn-ghost" id="exportBtn" onclick="exportVault()" title="Export">&#8615; Export</button>
+    <button class="btn btn-sm btn-ghost" id="importBtn" onclick="importVault()" title="Import">&#8614; Import</button>
+    <span class="toolbar-spacer"></span>
+    <span class="sync-indicator" id="syncIndicator">
+      <span class="sync-dot never"></span> <span id="syncLabel">Offline</span>
+    </span>
+    <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">&#9788;</button>
+    <span id="detectedFormat" style="font-size:12px;color:var(--text2);"></span>
+  </div>
+  <div class="content-area">
+    <div class="editor-pane">
+      <div class="pane-header"><span>Editor</span><span id="charCount">0 chars</span></div>
+      <textarea id="editor" placeholder="Write or paste your content here...&#10;&#10;Supports: Markdown, JSON, XML, plain text" oninput="onEditorInput()"></textarea>
+    </div>
+    <div class="preview-pane">
+      <div class="pane-header">Preview</div>
+      <div class="preview-content" id="preview">
+        <div class="empty-state">
+          <div class="empty-state-icon">&#128221;</div>
+          <h2>No note selected</h2>
+          <p>Create a new note or select one from the sidebar. Paste any content &mdash; Markdown, JSON, XML, or plain text.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="context-menu" id="contextMenu"></div>
+<div id="modalContainer"></div>
+
+<script>
+// === BIP39 WORDLIST ===
+var BIP39=["abandon","ability","able","about","above","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid","acoustic","acquire","across","act","action","actor","actress","actual","adapt","add","addict","address","adjust","admit","adult","advance","advice","aerobic","affair","afford","afraid","again","age","agent","agree","ahead","aim","air","airport","aisle","alarm","album","alcohol","alert","alien","all","alley","allow","almost","alone","alpha","already","also","alter","always","amateur","amazing","among","amount","amused","analyst","anchor","ancient","anger","angle","angry","animal","ankle","announce","annual","another","answer","antenna","antique","anxiety","any","apart","apology","appear","apple","approve","april","arch","arctic","area","arena","argue","arm","armed","armor","army","around","arrange","arrest","arrive","arrow","art","artefact","artist","artwork","ask","aspect","assault","asset","assist","assume","asthma","athlete","atom","attack","attend","attitude","attract","auction","audit","august","aunt","author","auto","autumn","average","avocado","avoid","awake","aware","away","awesome","awful","awkward","axis","baby","bachelor","bacon","badge","bag","balance","balcony","ball","bamboo","banana","banner","bar","barely","bargain","barrel","base","basic","basket","battle","beach","bean","beauty","because","become","beef","before","begin","behave","behind","believe","below","belt","bench","benefit","best","betray","better","between","beyond","bicycle","bid","bike","bind","biology","bird","birth","bitter","black","blade","blame","blanket","blast","bleak","bless","blind","blood","blossom","blouse","blue","blur","blush","board","boat","body","boil","bomb","bone","bonus","book","boost","border","boring","borrow","boss","bottom","bounce","box","boy","bracket","brain","brand","brass","brave","bread","breeze","brick","bridge","brief","bright","bring","brisk","broccoli","broken","bronze","broom","brother","brown","brush","bubble","buddy","budget","buffalo","build","bulb","bulk","bullet","bundle","bunker","burden","burger","burst","bus","business","busy","butter","buyer","buzz","cabbage","cabin","cable","cactus","cage","cake","call","calm","camera","camp","can","canal","cancel","candy","cannon","canoe","canvas","canyon","capable","capital","captain","car","carbon","card","cargo","carpet","carry","cart","case","cash","casino","castle","casual","cat","catalog","catch","category","cattle","caught","cause","caution","cave","ceiling","celery","cement","census","century","cereal","certain","chair","chalk","champion","change","chaos","chapter","charge","chase","chat","cheap","check","cheese","chef","cherry","chest","chicken","chief","child","chimney","choice","choose","chronic","chuckle","chunk","churn","cigar","cinnamon","circle","citizen","city","civil","claim","clap","clarify","claw","clay","clean","clerk","clever","click","client","cliff","climb","clinic","clip","clock","clog","close","cloth","cloud","clown","club","clump","cluster","clutch","coach","coast","coconut","code","coffee","coil","coin","collect","color","column","combine","come","comfort","comic","common","company","concert","conduct","confirm","congress","connect","consider","control","convince","cook","cool","copper","copy","coral","core","corn","correct","cost","cotton","couch","country","couple","course","cousin","cover","coyote","crack","cradle","craft","cram","crane","crash","crater","crawl","crazy","cream","credit","creek","crew","cricket","crime","crisp","critic","crop","cross","crouch","crowd","crucial","cruel","cruise","crumble","crunch","crush","cry","crystal","cube","culture","cup","cupboard","curious","current","curtain","curve","cushion","custom","cute","cycle","dad","damage","damp","dance","danger","daring","dash","daughter","dawn","day","deal","debate","debris","decade","december","decide","decline","decorate","decrease","deer","defense","define","defy","degree","delay","deliver","demand","demise","denial","dentist","deny","depart","depend","deposit","depth","deputy","derive","describe","desert","design","desk","despair","destroy","detail","detect","develop","device","devote","diagram","dial","diamond","diary","dice","diesel","diet","differ","digital","dignity","dilemma","dinner","dinosaur","direct","dirt","disagree","discover","disease","dish","dismiss","disorder","display","distance","divert","divide","divorce","dizzy","doctor","document","dog","doll","dolphin","domain","donate","donkey","donor","door","dose","double","dove","draft","dragon","drama","drastic","draw","dream","dress","drift","drill","drink","drip","drive","drop","drum","dry","duck","dumb","dune","during","dust","dutch","duty","dwarf","dynamic","eager","eagle","early","earn","earth","easily","east","easy","echo","ecology","economy","edge","edit","educate","effort","egg","eight","either","elbow","elder","electric","elegant","element","elephant","elevator","elite","else","embark","embody","embrace","emerge","emotion","employ","empower","empty","enable","enact","end","endless","endorse","enemy","energy","enforce","engage","engine","enhance","enjoy","enlist","enough","enrich","enroll","ensure","enter","entire","entry","envelope","episode","equal","equip","era","erase","erode","erosion","error","erupt","escape","essay","essence","estate","eternal","ethics","evidence","evil","evoke","evolve","exact","example","excess","exchange","excite","exclude","excuse","execute","exercise","exhaust","exhibit","exile","exist","exit","exotic","expand","expect","expire","explain","expose","express","extend","extra","eye","eyebrow","fabric","face","faculty","fade","faint","faith","fall","false","fame","family","famous","fan","fancy","fantasy","farm","fashion","fat","fatal","father","fatigue","fault","favorite","feature","february","federal","fee","feed","feel","female","fence","festival","fetch","fever","few","fiber","fiction","field","figure","file","film","filter","final","find","fine","finger","finish","fire","firm","first","fiscal","fish","fit","fitness","fix","flag","flame","flash","flat","flavor","flee","flight","flip","float","flock","floor","flower","fluid","flush","fly","foam","focus","fog","foil","fold","follow","food","foot","force","forest","forget","fork","fortune","forum","forward","fossil","foster","found","fox","fragile","frame","frequent","fresh","friend","fringe","frog","front","frost","frown","frozen","fruit","fuel","fun","funny","furnace","fury","future","gadget","gain","galaxy","gallery","game","gap","garage","garbage","garden","garlic","garment","gas","gasp","gate","gather","gauge","gaze","general","genius","genre","gentle","genuine","gesture","ghost","giant","gift","giggle","ginger","giraffe","girl","give","glad","glance","glare","glass","glide","glimpse","globe","gloom","glory","glove","glow","glue","goat","goddess","gold","good","goose","gorilla","gospel","gossip","govern","gown","grab","grace","grain","grant","grape","grass","gravity","great","green","grid","grief","grit","grocery","group","grow","grunt","guard","guess","guide","guilt","guitar","gun","gym","habit","hair","half","hammer","hamster","hand","happy","harbor","hard","harsh","harvest","hat","have","hawk","hazard","head","health","heart","heavy","hedgehog","height","hello","helmet","help","hen","hero","hidden","high","hill","hint","hip","hire","history","hobby","hockey","hold","hole","holiday","hollow","home","honey","hood","hope","horn","horror","horse","hospital","host","hotel","hour","hover","hub","huge","human","humble","humor","hundred","hungry","hunt","hurdle","hurry","hurt","husband","hybrid","ice","icon","idea","identify","idle","ignore","ill","illegal","illness","image","imitate","immense","immune","impact","impose","improve","impulse","inch","include","income","increase","index","indicate","indoor","industry","infant","inflict","inform","inhale","inherit","initial","inject","injury","inmate","inner","innocent","input","inquiry","insane","insect","inside","inspire","install","intact","interest","into","invest","invite","involve","iron","island","isolate","issue","item","ivory","jacket","jaguar","jar","jazz","jealous","jeans","jelly","jewel","job","join","joke","journey","joy","judge","juice","jump","jungle","junior","junk","just","kangaroo","keen","keep","ketchup","key","kick","kid","kidney","kind","kingdom","kiss","kit","kitchen","kite","kitten","kiwi","knee","knife","knock","know","lab","label","labor","ladder","lady","lake","lamp","language","laptop","large","later","latin","laugh","laundry","lava","law","lawn","lawsuit","layer","lazy","leader","leaf","learn","leave","lecture","left","leg","legal","legend","leisure","lemon","lend","length","lens","leopard","lesson","letter","level","liar","liberty","library","license","life","lift","light","like","limb","limit","link","lion","liquid","list","little","live","lizard","load","loan","lobster","local","lock","logic","lonely","long","loop","lottery","loud","lounge","love","loyal","lucky","luggage","lumber","lunar","lunch","luxury","lyrics","machine","mad","magic","magnet","maid","mail","main","major","make","mammal","man","manage","mandate","mango","mansion","manual","maple","marble","march","margin","marine","market","marriage","mask","mass","master","match","material","math","matrix","matter","maximum","maze","meadow","mean","measure","meat","mechanic","medal","media","melody","melt","member","memory","mention","menu","mercy","merge","merit","merry","mesh","message","metal","method","middle","midnight","milk","million","mimic","mind","minimum","minor","minute","miracle","mirror","misery","miss","mistake","mix","mixed","mixture","mobile","model","modify","mom","moment","monitor","monkey","monster","month","moon","moral","more","morning","mosquito","mother","motion","motor","mountain","mouse","move","movie","much","muffin","mule","multiply","muscle","museum","mushroom","music","must","mutual","myself","mystery","myth","naive","name","napkin","narrow","nasty","nation","nature","near","neck","need","negative","neglect","neither","nephew","nerve","nest","net","network","neutral","never","news","next","nice","night","noble","noise","nominee","noodle","normal","north","nose","notable","note","nothing","notice","novel","now","nuclear","number","nurse","nut","oak","obey","object","oblige","obscure","observe","obtain","obvious","occur","ocean","october","odor","off","offer","office","often","oil","okay","old","olive","olympic","omit","once","one","onion","online","only","open","opera","opinion","oppose","option","orange","orbit","orchard","order","ordinary","organ","orient","original","orphan","ostrich","other","outdoor","outer","output","outside","oval","oven","over","own","owner","oxygen","oyster","ozone","pact","paddle","page","pair","palace","palm","panda","panel","panic","panther","paper","parade","parent","park","parrot","party","pass","patch","path","patient","patrol","pattern","pause","pave","payment","peace","peanut","pear","peasant","pelican","pen","penalty","pencil","people","pepper","perfect","permit","person","pet","phone","photo","phrase","physical","piano","picnic","picture","piece","pig","pigeon","pill","pilot","pink","pioneer","pipe","pistol","pitch","pizza","place","planet","plastic","plate","play","please","pledge","pluck","plug","plunge","poem","poet","point","polar","pole","police","pond","pony","pool","popular","portion","position","possible","post","potato","pottery","poverty","powder","power","practice","praise","predict","prefer","prepare","present","pretty","prevent","price","pride","primary","print","priority","prison","private","prize","problem","process","produce","profit","program","project","promote","proof","property","prosper","protect","proud","provide","public","pudding","pull","pulp","pulse","pumpkin","punch","pupil","puppy","purchase","purity","purpose","purse","push","put","puzzle","pyramid","quality","quantum","quarter","question","quick","quit","quiz","quote","rabbit","raccoon","race","rack","radar","radio","rail","rain","raise","rally","ramp","ranch","random","range","rapid","rare","rate","rather","raven","raw","razor","ready","real","reason","rebel","rebuild","recall","receive","recipe","record","recycle","reduce","reflect","reform","refuse","region","regret","regular","reject","relax","release","relief","rely","remain","remember","remind","remove","render","renew","rent","reopen","repair","repeat","replace","report","require","rescue","resemble","resist","resource","response","result","retire","retreat","return","reunion","reveal","review","reward","rhythm","rib","ribbon","rice","rich","ride","ridge","rifle","right","rigid","ring","riot","ripple","risk","ritual","rival","river","road","roast","robot","robust","rocket","romance","roof","rookie","room","rose","rotate","rough","round","route","royal","rubber","rude","rug","rule","run","runway","rural","sad","saddle","sadness","safe","sail","salad","salmon","salon","salt","salute","same","sample","sand","satisfy","satoshi","sauce","sausage","save","say","scale","scan","scare","scatter","scene","scheme","school","science","scissors","scorpion","scout","scrap","screen","script","scrub","sea","search","season","seat","second","secret","section","security","seed","seek","segment","select","sell","seminar","senior","sense","sentence","series","service","session","settle","setup","seven","shadow","shaft","shallow","share","shed","shell","sheriff","shield","shift","shine","ship","shiver","shock","shoe","shoot","shop","short","shoulder","shove","shrimp","shrug","shuffle","shy","sibling","sick","side","siege","sight","sign","silent","silk","silly","silver","similar","simple","since","sing","siren","sister","situate","six","size","skate","sketch","ski","skill","skin","skirt","skull","slab","slam","sleep","slender","slice","slide","slight","slim","slogan","slot","slow","slush","small","smart","smile","smoke","smooth","snack","snake","snap","sniff","snow","soap","soccer","social","sock","soda","soft","solar","soldier","solid","solution","solve","someone","song","soon","sorry","sort","soul","sound","soup","source","south","space","spare","spatial","spawn","speak","special","speed","spell","spend","sphere","spice","spider","spike","spin","spirit","split","spoil","sponsor","spoon","sport","spot","spray","spread","spring","spy","square","squeeze","squirrel","stable","stadium","staff","stage","stairs","stamp","stand","start","state","stay","steak","steel","stem","step","stereo","stick","still","sting","stock","stomach","stone","stool","story","stove","strategy","street","strike","strong","struggle","student","stuff","stumble","style","subject","submit","subway","success","such","sudden","suffer","sugar","suggest","suit","summer","sun","sunny","sunset","super","supply","supreme","sure","surface","surge","surprise","surround","survey","suspect","sustain","swallow","swamp","swap","swarm","swear","sweet","swift","swim","swing","switch","sword","symbol","symptom","syrup","system","table","tackle","tag","tail","talent","talk","tank","tape","target","task","taste","tattoo","taxi","teach","team","tell","ten","tenant","tennis","tent","term","test","text","thank","that","theme","then","theory","there","they","thing","this","thought","three","thrive","throw","thumb","thunder","ticket","tide","tiger","tilt","timber","time","tiny","tip","tired","tissue","title","toast","tobacco","today","toddler","toe","together","toilet","token","tomato","tomorrow","tone","tongue","tonight","tool","tooth","top","topic","topple","torch","tornado","tortoise","toss","total","tourist","toward","tower","town","toy","track","trade","traffic","tragic","train","transfer","trap","trash","travel","tray","treat","tree","trend","trial","tribe","trick","trigger","trim","trip","trophy","trouble","truck","true","truly","trumpet","trust","truth","try","tube","tuition","tumble","tuna","tunnel","turkey","turn","turtle","twelve","twenty","twice","twin","twist","two","type","typical","ugly","umbrella","unable","unaware","uncle","uncover","under","undo","unfair","unfold","unhappy","uniform","unique","unit","universe","unknown","unlock","until","unusual","unveil","update","upgrade","uphold","upon","upper","upset","urban","urge","usage","use","used","useful","useless","usual","utility","vacant","vacuum","vague","valid","valley","valve","van","vanish","vapor","various","vast","vault","vehicle","velvet","vendor","venture","venue","verb","verify","version","very","vessel","veteran","viable","vibrant","vicious","victory","video","view","village","vintage","violin","virtual","virus","visa","visit","visual","vital","vivid","vocal","voice","void","volcano","volume","vote","voyage","wage","wagon","wait","walk","wall","walnut","want","warfare","warm","warrior","wash","wasp","waste","water","wave","way","wealth","weapon","wear","weasel","weather","web","wedding","weekend","weird","welcome","west","wet","whale","what","wheat","wheel","when","where","whip","whisper","wide","width","wife","wild","will","win","window","wine","wing","wink","winner","winter","wire","wisdom","wise","wish","witness","wolf","woman","wonder","wood","wool","word","work","world","worry","worth","wrap","wreck","wrestle","wrist","write","wrong","yard","year","yellow","you","young","youth","zebra","zero","zone","zoo"];
+
+// === STATE ===
+var db=null,currentNoteId=null,currentFolderId=null,saveTimer=null,expandedFolders=new Set();
+var recoveryKey=null,passphraseKey=null,githubToken=null,gistId=null,syncEnabled=false;
+var isLocked=true,searchQuery="",autoSyncTimer=null;
+
+// === DATABASE ===
+function openDB(){return new Promise(function(r,j){var req=indexedDB.open("NoteVaultDB",2);req.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("notes")){var s=d.createObjectStore("notes",{keyPath:"id"});s.createIndex("folderId","folderId",{unique:false});s.createIndex("updatedAt","updatedAt",{unique:false});}else{var ns=e.target.transaction.objectStore("notes");if(!ns.indexNames.contains("folderId"))ns.createIndex("folderId","folderId",{unique:false});if(!ns.indexNames.contains("updatedAt"))ns.createIndex("updatedAt","updatedAt",{unique:false});}if(!d.objectStoreNames.contains("folders")){var s2=d.createObjectStore("folders",{keyPath:"id"});s2.createIndex("parentId","parentId",{unique:false});}if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"key"});};req.onsuccess=function(e){db=e.target.result;r(db);};req.onerror=function(e){j(e.target.error);};});}
+function dbPut(store,val){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).put(val);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
+function dbGet(store,key){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).get(key);req.onsuccess=function(){r(req.result);};req.onerror=function(){r(null);};});}
+function dbGetAll(store){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).getAll();req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
+function dbDelete(store,key){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).delete(key);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
+function dbGetByIndex(store,idx,val){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).index(idx).getAll(val);req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
+
+// === FORMAT DETECTION ===
+function detectFormat(c){var t=c.trim();if(!t)return"text";if(t.startsWith("<?xml")||(t.startsWith("<")&&t.includes(">")&&!t.startsWith("<!")&&!t.startsWith("<html"))){try{var p=new DOMParser().parseFromString(t,"text/xml");if(!p.querySelector("parsererror"))return"xml";}catch(_){}}if((t.startsWith("{")&&t.endsWith("}"))||(t.startsWith("[")&&t.endsWith("]"))){try{JSON.parse(t);return"json";}catch(_){}}var md=/^(#{1,6}\s|\*\s|-\s|\d+\.\s|>\s|```|\[.*\]\(.*\)|!\[.*\]\(.*\)|\|.*\|)/m;if(md.test(t))return"markdown";return"text";}
+function escapeHtml(s){var m={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"};return s.replace(/[&<>"']/g,function(c){return m[c];});}
+function highlightXML(x){var e=escapeHtml(x);return e.replace(/(&lt;\/?)([\w:.-]+)/g,"$1<span class=xml-key>$2</span>").replace(/(&lt;|&gt;|\/&gt;)/g,"<span class=xml-bracket>$1</span>").replace(/(\s[\w:-]+)=(&quot;.*?&quot;)/g," <span class=xml-attr>$1</span>=<span class=xml-string>$2</span>");}
+
+// === JSON COLLAPSIBLE TREE VIEW ===
+function renderJSONTree(data,path){path=path||"$";var container=document.createElement("div");container.className="json-tree";renderNode(container,data,path,true);return container;}
+function renderNode(parent,val,path,isRoot){var line=document.createElement("div");line.className="json-line";
+  if(val===null){line.innerHTML='<span class=json-val-null>null</span>';parent.appendChild(line);return;}
+  if(typeof val==="boolean"){line.innerHTML='<span class=json-val-bool>'+val+'</span>';parent.appendChild(line);return;}
+  if(typeof val==="number"){line.innerHTML='<span class=json-val-number>'+val+'</span>';parent.appendChild(line);return;}
+  if(typeof val==="string"){line.innerHTML='<span class=json-val-string>"'+escapeHtml(val)+'"</span>';parent.appendChild(line);return;}
+  if(Array.isArray(val)){var isCollapsed=path.split(".").length>4;var wrapper=document.createElement("div");wrapper.className="json-node";
+    var header=document.createElement("div");header.className="json-line";
+    var toggle=document.createElement("span");toggle.className="json-toggle";toggle.textContent=isCollapsed?"\u25b6":"\u25bc";
+    var bracket=document.createElement("span");bracket.className="json-bracket";bracket.textContent="[";
+    var preview=document.createElement("span");preview.className="json-preview";preview.textContent=isCollapsed?" "+val.length+" items":"";
+    var closeBracket=document.createElement("span");closeBracket.className="json-bracket";closeBracket.textContent="]";
+    var copyPath=document.createElement("span");copyPath.className="json-copy-path";copyPath.textContent="\u2398";
+    copyPath.onclick=function(e){e.stopPropagation();navigator.clipboard.writeText(path);showToast("Path copied");};
+    header.appendChild(toggle);header.appendChild(bracket);header.appendChild(preview);
+    if(!isCollapsed)header.appendChild(closeBracket);
+    header.appendChild(copyPath);
+    var childrenDiv=document.createElement("div");
+    if(isCollapsed)childrenDiv.style.display="none";
+    for(var i=0;i<val.length;i++){(function(i){var childWrapper=document.createElement("div");childWrapper.className="json-node";
+      var idx=document.createElement("span");idx.className="json-key-name";idx.textContent=i+": ";
+      var childLine=document.createElement("div");childLine.className="json-line";childLine.appendChild(idx);
+      childWrapper.appendChild(childLine);
+      renderNode(childWrapper,val[i],path+"["+i+"]",false);
+      childrenDiv.appendChild(childWrapper);
+    })(i);}
+    var closeLine=document.createElement("div");closeLine.className="json-line";
+    var cb=document.createElement("span");cb.className="json-bracket";cb.textContent="]";
+    closeLine.appendChild(cb);if(isCollapsed)closeLine.style.display="none";
+    childrenDiv.appendChild(closeLine);
+    toggle.onclick=function(){var cd=childrenDiv;var isHidden=cd.style.display==="none"||!cd.style.display;
+      cd.style.display=isHidden?"":"none";toggle.textContent=isHidden?"\u25bc":"\u25b6";
+      preview.textContent=isHidden?"":" "+val.length+" items";closeLine.style.display=isHidden?"":"none";
+      if(!isHidden){closeBracket.style.display="none";}else{header.appendChild(closeBracket);}};
+    wrapper.appendChild(header);wrapper.appendChild(childrenDiv);parent.appendChild(wrapper);return;}
+  if(typeof val==="object"){var keys=Object.keys(val);var isCollapsed2=path.split(".").length>4;var wrapper2=document.createElement("div");wrapper2.className="json-node";
+    var header2=document.createElement("div");header2.className="json-line";
+    var toggle2=document.createElement("span");toggle2.className="json-toggle";toggle2.textContent=isCollapsed2?"\u25b6":"\u25bc";
+    var bracket2=document.createElement("span");bracket2.className="json-bracket";bracket2.textContent="{";
+    var preview2=document.createElement("span");preview2.className="json-preview";preview2.textContent=isCollapsed2?" "+keys.length+" keys":"";
+    var closeBracket2=document.createElement("span");closeBracket2.className="json-bracket";closeBracket2.textContent="}";
+    var copyPath2=document.createElement("span");copyPath2.className="json-copy-path";copyPath2.textContent="\u2398";
+    copyPath2.onclick=function(e){e.stopPropagation();navigator.clipboard.writeText(path);showToast("Path copied");};
+    header2.appendChild(toggle2);header2.appendChild(bracket2);header2.appendChild(preview2);
+    if(!isCollapsed2)header2.appendChild(closeBracket2);
+    header2.appendChild(copyPath2);
+    var childrenDiv2=document.createElement("div");
+    if(isCollapsed2)childrenDiv2.style.display="none";
+    keys.forEach(function(k){var childWrapper=document.createElement("div");childWrapper.className="json-node";
+      var childLine=document.createElement("div");childLine.className="json-line";
+      var keySpan=document.createElement("span");keySpan.className="json-key-name";keySpan.textContent='"'+k+'"';
+      var colon=document.createElement("span");colon.className="json-colon";colon.textContent=": ";
+      childLine.appendChild(keySpan);childLine.appendChild(colon);
+      childWrapper.appendChild(childLine);
+      renderNode(childWrapper,val[k],path+"."+k,false);
+      childrenDiv2.appendChild(childWrapper);
+    });
+    var closeLine2=document.createElement("div");closeLine2.className="json-line";
+    var cb2=document.createElement("span");cb2.className="json-bracket";cb2.textContent="}";
+    closeLine2.appendChild(cb2);if(isCollapsed2)closeLine2.style.display="none";
+    childrenDiv2.appendChild(closeLine2);
+    toggle2.onclick=function(){var cd=childrenDiv2;var isHidden=cd.style.display==="none"||!cd.style.display;
+      cd.style.display=isHidden?"":"none";toggle2.textContent=isHidden?"\u25bc":"\u25b6";
+      preview2.textContent=isHidden?"":" "+keys.length+" keys";closeLine2.style.display=isHidden?"":"none";
+      if(!isHidden){closeBracket2.style.display="none";}else{header2.appendChild(closeBracket2);}};
+    wrapper2.appendChild(header2);wrapper2.appendChild(childrenDiv2);parent.appendChild(wrapper2);return;}
+  line.innerHTML='<span>'+escapeHtml(String(val))+'</span>';parent.appendChild(line);}
+
+function renderContent(content,format){if(format==="markdown"){marked.setOptions({breaks:true,gfm:true});return marked.parse(content);}
+  if(format==="json"){try{var parsed=JSON.parse(content);var tree=renderJSONTree(parsed);return tree.outerHTML;}catch(_){return '<pre><code>'+escapeHtml(content)+'</code></pre>';}}
+  if(format==="xml")return'<pre><code>'+highlightXML(content)+'</code></pre>';
+  return'<pre class="text-block">'+escapeHtml(content)+'</pre>';}
+
+function updatePreview(){var content=document.getElementById("editor").value;var fs=document.getElementById("formatSelect").value;
+  var format=fs==="auto"?detectFormat(content):fs;var preview=document.getElementById("preview");
+  var detected=document.getElementById("detectedFormat");
+  if(!content.trim()&&!currentNoteId){preview.innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';detected.textContent="";return;}
+  var actualFormat=fs==="auto"?detectFormat(content):fs;detected.textContent="Detected: "+actualFormat;
+  preview.innerHTML=renderContent(content,actualFormat);
+  document.getElementById("charCount").textContent=content.length+" chars";}
+
+function onEditorInput(){updatePreview();if(currentNoteId)scheduleSave();}
+function onFormatChange(){updatePreview();if(currentNoteId)scheduleSave();}
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveCurrentNote,500);scheduleAutoSync();}
+
+// === FOLDER TREE ===
+async function refreshFolderTree(){var folders=await dbGetAll("folders");var notes=await dbGetAll("notes");
+  var tree=document.getElementById("folderTree");var stats=document.getElementById("stats");
+  var q=searchQuery.toLowerCase();
+  var filteredNotes=q?notes.filter(function(n){return (n.title||"").toLowerCase().includes(q)||(n.content||"").toLowerCase().includes(q);}):notes;
+  var noteCounts={};notes.forEach(function(n){var fid=n.folderId||"__root__";noteCounts[fid]=(noteCounts[fid]||0)+1;});
+  function buildTree(parentId,level){parentId=parentId||null;level=level||0;var children=folders.filter(function(f){return f.parentId===parentId;});
+    var folderNotes=filteredNotes.filter(function(n){return (n.folderId||null)===parentId;});
+    var html="";
+    children.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(f){var cid=f.id;var isExp=expandedFolders.has(cid);
+      var childCount=folders.filter(function(cf){return cf.parentId===cid;}).length;
+      var hasChildren=childCount>0;var noteCount=noteCounts[cid]||0;
+      html+='<div class=tree-item id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="selectFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')">'+
+        '<span class=tree-arrow onclick="event.stopPropagation();toggleFolder(\''+cid+'\')">'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
+        '<span class=tree-icon>'+(isExp?"\uD83D\uDCC2":"\uD83D\uDCC1")+'</span>'+
+        '<span class=tree-name>'+escapeHtml(f.name)+'</span>'+
+        (noteCount?'<span class=tree-badge>'+noteCount+'</span>':"")+
+        '<span class=tree-actions>'+
+        '<button class=btn-icon title="Add note" onclick="event.stopPropagation();createNoteInFolder(\''+cid+'\')">+</button>'+
+        '<button class=btn-icon title="Add subfolder" onclick="event.stopPropagation();createSubfolder(\''+cid+'\')">\uD83D\uDCC1</button>'+
+        '</span></div>';
+      var childHtml=buildTree(cid,level+1);
+      html+='<div class="tree-children'+(isExp?"":" collapsed")+'" id=tree-children-'+cid+'>'+childHtml+'</div>';
+    });
+    folderNotes.sort(function(a,b){return b.updatedAt-a.updatedAt;}).forEach(function(n){var fmt=n.format==="auto"?detectFormat(n.content):n.format;
+      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id=tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')">'+
+        '<span class=tree-arrow></span>'+
+        '<span class=tree-icon>\uD83D\uDCC4</span>'+
+        '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'</span>'+
+        '<span class=tree-badge>'+fmt+'</span>'+
+        '</div>';
+    });
+    return html;}
+  tree.innerHTML=buildTree();
+  var totalNotes=notes.length;var totalFolders=folders.length;
+  stats.textContent=totalFolders+" folder"+(totalFolders!==1?"s":"")+" \u00B7 "+totalNotes+" note"+(totalNotes!==1?"s":"");}
+
+function toggleFolder(id){expandedFolders.has(id)?expandedFolders.delete(id):expandedFolders.add(id);refreshFolderTree();}
+function selectFolder(id){currentFolderId=id;currentNoteId=null;document.getElementById("editor").value="";
+  document.getElementById("formatSelect").value="auto";
+  document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>\uD83D\uDCC1</div><h2>Folder selected</h2><p>Select a note or create a new one in this folder.</p></div>';
+  document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";refreshFolderTree();}
+
+async function createNoteInFolder(fid){var id=crypto.randomUUID();var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
+  await dbPut("notes",note);refreshFolderTree();loadNote(id);}
+async function createNote(){await createNoteInFolder(currentFolderId);}
+
+async function createSubfolder(parentId){var name=prompt("Folder name:");if(!name||!name.trim())return;
+  var id=crypto.randomUUID();var folder={id:id,name:name.trim(),parentId:parentId||null,order:0,createdAt:Date.now(),updatedAt:Date.now()};
+  await dbPut("folders",folder);expandedFolders.add(parentId||"__root__");refreshFolderTree();showToast("Folder created");}
+
+async function createRootFolder(){var name=prompt("Folder name:");if(!name||!name.trim())return;
+  var id=crypto.randomUUID();var folder={id:id,name:name.trim(),parentId:null,order:0,createdAt:Date.now(),updatedAt:Date.now()};
+  await dbPut("folders",folder);refreshFolderTree();showToast("Folder created");}
+
+async function renameFolder(id){var f=await dbGet("folders",id);if(!f)return;var name=prompt("Rename folder:",f.name);if(!name||!name.trim())return;
+  f.name=name.trim();f.updatedAt=Date.now();await dbPut("folders",f);refreshFolderTree();showToast("Folder renamed");}
+
+async function deleteFolder(id){var children=await dbGetByIndex("folders","parentId",id);var notes=await dbGetByIndex("notes","folderId",id);
+  var total=children.length+notes.length;if(!confirm("Delete folder"+(total?" and "+total+" items":"")+"?"))return;
+  for(var i=0;i<children.length;i++)await deleteFolder(children[i].id);for(var j=0;j<notes.length;j++)await dbDelete("notes",notes[j].id);
+  await dbDelete("folders",id);if(currentFolderId===id){currentFolderId=null;clearEditor();}refreshFolderTree();showToast("Deleted");}
+
+async function moveFolder(id){var targetId=prompt("Move to folder ID (blank for root):");
+  var f=await dbGet("folders",id);if(!f)return;f.parentId=targetId&&targetId.trim()?targetId.trim():null;f.updatedAt=Date.now();
+  await dbPut("folders",f);refreshFolderTree();showToast("Folder moved");}
+
+// === CONTEXT MENUS ===
+function folderContext(e,id){e.preventDefault();showContextMenu(e,[
+  {label:"New subfolder",action:function(){createSubfolder(id);}},
+  {label:"New note",action:function(){createNoteInFolder(id);}},
+  {label:"Rename",action:function(){renameFolder(id);}},
+  {label:"Move",action:function(){moveFolder(id);}},
+  {label:"Delete",action:function(){deleteFolder(id);},danger:true}
+]);}
+function noteContext(e,id){e.preventDefault();showContextMenu(e,[
+  {label:"Delete note",action:function(){currentNoteId=id;deleteCurrentNote();},danger:true}
+]);}
+function showContextMenu(e,items){var menu=document.getElementById("contextMenu");
+  menu.innerHTML=items.map(function(i){return'<div class="context-menu-item'+(i.danger?" danger":"")+'" id="ctx-'+i.label+'">'+i.label+'</div>';}).join("");
+  menu.style.display="block";menu.style.left=Math.min(e.clientX,window.innerWidth-170)+"px";menu.style.top=Math.min(e.clientY,window.innerHeight-items.length*40-20)+"px";
+  items.forEach(function(i,idx){var el=document.getElementById("ctx-"+i.label);if(el)el.onclick=function(){menu.style.display="none";i.action();};});
+  setTimeout(function(){document.addEventListener("click",function(){menu.style.display="none";},{once:true});},0);}
+
+// === NOTE OPERATIONS ===
+async function loadNote(id){currentNoteId=id;var note=await dbGet("notes",id);if(!note)return;
+  document.getElementById("editor").value=note.content;document.getElementById("formatSelect").value=note.format;
+  currentFolderId=note.folderId;updatePreview();refreshFolderTree();}
+
+async function saveCurrentNote(){if(!currentNoteId||!db)return;var content=document.getElementById("editor").value;
+  var format=document.getElementById("formatSelect").value;
+  var title=content.split("\n")[0].replace(/^#+\s*/,"").trim().substring(0,80)||"Untitled";
+  var existing=await dbGet("notes",currentNoteId);
+  var note={id:currentNoteId,folderId:existing?existing.folderId:currentFolderId,title:title,content:content,format:format,
+    createdAt:existing?existing.createdAt:Date.now(),updatedAt:Date.now()};
+  await dbPut("notes",note);refreshFolderTree();}
+
+async function deleteCurrentNote(){if(!currentNoteId||!db)return;if(!confirm("Delete this note permanently?"))return;
+  await dbDelete("notes",currentNoteId);currentNoteId=null;clearEditor();refreshFolderTree();showToast("Deleted");}
+
+function clearEditor(){document.getElementById("editor").value="";document.getElementById("formatSelect").value="auto";
+  document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';
+  document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";}
+
+function onSearch(){searchQuery=document.getElementById("searchInput").value;refreshFolderTree();}
+
+// === THEME ===
+function toggleTheme(){var html=document.documentElement;var current=html.getAttribute("data-theme");
+  var next=current==="dark"?"light":"dark";html.setAttribute("data-theme",next);
+  document.getElementById("themeBtn").innerHTML=next==="dark"?"&#9788;":"&#9790;";
+  dbPut("settings",{key:"theme",value:next}).catch(function(){});}
+
+async function initTheme(){var s=await dbGet("settings","theme");
+  if(s&&s.value){document.documentElement.setAttribute("data-theme",s.value);
+    document.getElementById("themeBtn").innerHTML=s.value==="dark"?"&#9788;":"&#9790;";
+  }else{var prefers=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
+    document.documentElement.setAttribute("data-theme",prefers);
+    document.getElementById("themeBtn").innerHTML=prefers==="dark"?"&#9788;":"&#9790";}}
+
+// === MOBILE SIDEBAR ===
+function toggleSidebar(){var sb=document.getElementById("sidebar");var bd=document.getElementById("mobileBackdrop");
+  sb.classList.toggle("open");bd.classList.toggle("open");}
+function closeSidebar(){document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("mobileBackdrop").classList.remove("open");}
+
+// === TOAST ===
+function showToast(msg,isError){var t=document.getElementById("toast");t.textContent=msg;t.className="toast"+(isError?" error":"");
+  t.classList.add("show");setTimeout(function(){t.classList.remove("show");},2500);}
+
+// === ENCRYPTION MODULE ===
+async function deriveKey(passphrase,salt,iterations,extractable){iterations=iterations||600000;extractable=extractable||false;var enc=new TextEncoder();
+  var keyMaterial=await crypto.subtle.importKey("raw",enc.encode(passphrase),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt:enc.encode(salt),iterations:iterations,hash:"SHA-256"},keyMaterial,{name:"AES-GCM",length:256},extractable,["encrypt","decrypt","wrapKey","unwrapKey"]);}
+
+async function encryptAES(key,plaintext){var enc=new TextEncoder();var iv=crypto.getRandomValues(new Uint8Array(12));
+  var ciphertext=await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,enc.encode(plaintext));
+  return{iv:Array.from(iv),ciphertext:Array.from(new Uint8Array(ciphertext))};}
+
+async function decryptAES(key,data){var iv=new Uint8Array(data.iv);var ct=new Uint8Array(data.ciphertext);
+  var plaintext=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},key,ct);
+  return new TextDecoder().decode(plaintext);}
+
+async function encryptAESString(key,plaintext){var d=await encryptAES(key,plaintext);return JSON.stringify(d);}
+async function decryptAESString(key,json){return decryptAES(key,JSON.parse(json));}
+
+async function wrapKey(wrappingKey,keyToWrap){var iv=crypto.getRandomValues(new Uint8Array(12));
+  var wrapped=await crypto.subtle.wrapKey("raw",keyToWrap,wrappingKey,{name:"AES-GCM",iv:iv});
+  return{iv:Array.from(iv),wrapped:Array.from(new Uint8Array(wrapped))};}
+
+async function unwrapKey(wrappingKey,wrappedData){var iv=new Uint8Array(wrappedData.iv);
+  var wrapped=new Uint8Array(wrappedData.wrapped);
+  return crypto.subtle.unwrapKey("raw",wrapped,wrappingKey,{name:"AES-GCM",iv:iv},{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);}
+
+// === RECOVERY KEY ===
+function generateRecoveryKey(){var words=[];var arr=new Uint16Array(12);crypto.getRandomValues(arr);
+  for(var i=0;i<12;i++)words.push(BIP39[arr[i]%2048]);return words;}
+
+async function deriveRecoveryKey(words){var s=await dbGet("settings","recovery_salt");var salt=s?s.value:"notevault-recovery";
+  return deriveKey(words.join(" "),salt,100000,true);}
+
+// === SETUP / UNLOCK / RECOVERY ===
+async function isSetup(){var s=await dbGet("settings","passphrase_salt");return!!s;}
+
+async function showSetup(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
+    '<h2>Set up NoteVault</h2>'+
+    '<p>Create a passphrase to encrypt your notes. Choose something memorable but strong.</p>'+
+    '<input type=password id=setupPassphrase placeholder="Enter passphrase" autocomplete="new-password">'+
+    '<input type=password id=setupPassphraseConfirm placeholder="Confirm passphrase">'+
+    '<div id=setupError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="document.getElementById(\'modalContainer\').innerHTML=\'\'">Cancel</button>'+
+    '<button class=btn id=setupNextBtn onclick="startSetup()">Next</button>'+
+    '</div></div></div>';}
+
+async function startSetup(){var pw=document.getElementById("setupPassphrase").value;
+  var confirm=document.getElementById("setupPassphraseConfirm").value;var err=document.getElementById("setupError");
+  if(pw.length<8){err.textContent="Passphrase must be at least 8 characters";err.style.display="";return;}
+  if(pw!==confirm){err.textContent="Passphrases do not match";err.style.display="";return;}
+  var salt=crypto.randomUUID();var words=generateRecoveryKey();
+  await dbPut("settings",{key:"passphrase_salt",value:salt});
+  var recoverySalt=crypto.randomUUID();
+  await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
+  passphraseKey=await deriveKey(pw,salt);
+  recoveryKey=await deriveRecoveryKey(words);
+  var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
+  await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+  var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
+  await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
+  var verify=await encryptAESString(recoveryKey,"notevault-verify");
+  await dbPut("settings",{key:"recovery_verify",value:verify});
+  showRecoveryWords(words);}
+
+function showRecoveryWords(words){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
+    '<h2>Your Recovery Key</h2>'+
+    '<p style="color:var(--warning);">Write these 12 words down on paper and store them safely. You will need them to recover your notes if you forget your passphrase.</p>'+
+    '<div class=recovery-words>'+words.map(function(w,i){return'<div class=recovery-word><span class=index>'+(i+1)+'</span>'+w+'</div>';}).join("")+'</div>'+
+    '<p style="font-size:12px;color:var(--text3);">Warning: If you lose both your passphrase and recovery key, your data cannot be recovered.</p>'+
+    '<div class=modal-actions>'+
+    '<button class=btn id=confirmRecoveryBtn onclick="verifyRecoveryWords()">I\'ve written them down</button>'+
+    '</div></div></div>';}
+
+function verifyRecoveryWords(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:480px;">'+
+    '<h2>Verify Recovery Key</h2>'+
+    '<p>Enter the 12 recovery words in order to verify you\'ve saved them correctly.</p>'+
+    '<textarea id=verifyWords rows=4 placeholder="Enter all 12 words separated by spaces"></textarea>'+
+    '<div id=verifyError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="skipVerify()">Skip</button>'+
+    '<button class=btn onclick="doVerifyRecovery()">Verify</button>'+
+    '</div></div></div>';}
+
+async function skipVerify(){await dbPut("settings",{key:"setup_complete",value:true});
+  document.getElementById("modalContainer").innerHTML="";isLocked=false;await refreshFolderTree();updatePreview();showToast("Setup complete!");}
+
+async function doVerifyRecovery(){var input=document.getElementById("verifyWords").value.trim().split(/\s+/);var err=document.getElementById("verifyError");
+  if(input.length!==12){err.textContent="Please enter exactly 12 words";err.style.display="";return;}
+  try{var testKey=await deriveRecoveryKey(input);var verifyEnc=await dbGet("settings","recovery_verify");
+    var decrypted=await decryptAESString(testKey,verifyEnc.value);
+    if(decrypted!=="notevault-verify"){err.textContent="Words do not match.";err.style.display="";return;}
+    await dbPut("settings",{key:"setup_complete",value:true});
+    document.getElementById("modalContainer").innerHTML="";isLocked=false;recoveryKey=testKey;
+    await refreshFolderTree();updatePreview();showToast("Setup complete!");
+  }catch(e){err.textContent="Words do not match: "+e.message;err.style.display="";}}
+
+async function showUnlock(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal>'+
+    '<h2>Unlock NoteVault</h2>'+
+    '<p>Enter your passphrase to unlock your notes.</p>'+
+    '<input type=password id=unlockPassphrase placeholder="Enter passphrase" autocomplete="current-password">'+
+    '<div id=unlockError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="showRecovery()">Forgot passphrase?</button>'+
+    '<button class=btn onclick="doUnlock()">Unlock</button>'+
+    '</div></div></div>';
+  setTimeout(function(){var el=document.getElementById("unlockPassphrase");if(el)el.focus();},100);}
+
+async function doUnlock(){var pw=document.getElementById("unlockPassphrase").value;var err=document.getElementById("unlockError");
+  try{var salt=await dbGet("settings","passphrase_salt");var storedHash=await dbGet("settings","passphrase_hash");
+    var key=await deriveKey(pw,salt.value);var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt.value));
+    var hashHex=Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
+    if(hashHex!==storedHash.value){err.textContent="Incorrect passphrase";err.style.display="";return;}
+    passphraseKey=key;var wrappedRK=await dbGet("settings","recovery_key_encrypted");
+    recoveryKey=await unwrapKey(passphraseKey,JSON.parse(wrappedRK.value));
+    var tokenEnc=await dbGet("settings","github_token_encrypted");
+    if(tokenEnc){try{githubToken=await decryptAESString(recoveryKey,tokenEnc.value);}catch(_){githubToken=null;}}
+    var gid=await dbGet("settings","gist_id");if(gid)gistId=gid.value;
+    var se=await dbGet("settings","auto_sync");if(se)syncEnabled=se.value;
+    document.getElementById("modalContainer").innerHTML="";isLocked=false;
+    await refreshFolderTree();updatePreview();updateSyncIndicator();showToast("Unlocked");
+  }catch(e){err.textContent="Error unlocking: "+e.message;err.style.display="";}}
+
+async function showRecovery(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
+    '<h2>Recover Your Notes</h2>'+
+    '<p>Enter your 12 recovery words to regain access.</p>'+
+    '<textarea id=recoveryInput rows=4 placeholder="Enter all 12 words separated by spaces"></textarea>'+
+    '<div id=recoveryError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="showUnlock()">Back</button>'+
+    '<button class=btn onclick="doRecovery()">Recover</button>'+
+    '</div></div></div>';}
+
+async function doRecovery(){var input=document.getElementById("recoveryInput").value.trim().split(/\s+/);var err=document.getElementById("recoveryError");
+  if(input.length!==12){err.textContent="Please enter exactly 12 words";err.style.display="";return;}
+  try{var testKey=await deriveRecoveryKey(input);var verifyEnc=await dbGet("settings","recovery_verify");
+    var decrypted=await decryptAESString(testKey,verifyEnc.value);
+    if(decrypted!=="notevault-verify"){err.textContent="Invalid recovery words.";err.style.display="";return;}
+    recoveryKey=testKey;showNewPassphrase();}catch(e){err.textContent="Invalid recovery words: "+e.message;err.style.display="";}}
+
+function showNewPassphrase(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal>'+
+    '<h2>Set New Passphrase</h2>'+
+    '<p>Recovery successful! Set a new passphrase.</p>'+
+    '<input type=password id=newPassphrase placeholder="New passphrase">'+
+    '<input type=password id=newPassphraseConfirm placeholder="Confirm new passphrase">'+
+    '<div id=newPassError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class=btn onclick="setNewPassphrase()">Save</button>'+
+    '</div></div></div>';}
+
+async function setNewPassphrase(){var pw=document.getElementById("newPassphrase").value;
+  var confirm=document.getElementById("newPassphraseConfirm").value;var err=document.getElementById("newPassError");
+  if(pw.length<8){err.textContent="Passphrase must be at least 8 characters";err.style.display="";return;}
+  if(pw!==confirm){err.textContent="Passphrases do not match";err.style.display="";return;}
+  var salt=crypto.randomUUID();passphraseKey=await deriveKey(pw,salt);
+  var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
+  await dbPut("settings",{key:"passphrase_salt",value:salt});
+  await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+  var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
+  await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
+  if(githubToken){var encTok=await encryptAESString(recoveryKey,githubToken);await dbPut("settings",{key:"github_token_encrypted",value:encTok});}
+  document.getElementById("modalContainer").innerHTML="";isLocked=false;
+  await refreshFolderTree();updatePreview();showToast("Passphrase updated");}
+
+async function changePassphrase(){var pw=prompt("Enter current passphrase:");if(!pw)return;
+  try{var salt=await dbGet("settings","passphrase_salt");var storedHash=await dbGet("settings","passphrase_hash");
+    var key=await deriveKey(pw,salt.value);var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt.value));
+    var hashHex=Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
+    if(hashHex!==storedHash.value){showToast("Incorrect passphrase",true);return;}
+    var newPw=prompt("Enter new passphrase:");if(!newPw||newPw.length<8){showToast("Passphrase too short",true);return;}
+    var confirm2=prompt("Confirm new passphrase:");if(newPw!==confirm2){showToast("Passphrases do not match",true);return;}
+    var newSalt=crypto.randomUUID();var newKey=await deriveKey(newPw,newSalt);
+    var wrappedRK=await wrapKey(newKey,recoveryKey);
+    await dbPut("settings",{key:"passphrase_salt",value:newSalt});
+    await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+    var newHash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(newPw+":"+newSalt));
+    await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(newHash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
+    passphraseKey=newKey;showToast("Passphrase changed");
+  }catch(e){showToast("Error: "+e.message,true);}}
+
+// === GITHUB GIST SYNC ===
+async function manualSync(){if(!githubToken){showToast("Set up GitHub token in Settings first",true);return;}
+  if(!gistId){await firstSync();}else{await syncToGist();}}
+
+async function firstSync(){var vault=await getVaultJSON();var plaintext=JSON.stringify(vault);
+  var encrypted=await encryptAES(recoveryKey,plaintext);
+  var blob=JSON.stringify({v:1,iv:encrypted.iv,data:encrypted.ciphertext});
+  var resp=await fetch("https://api.github.com/gists",{method:"POST",headers:{Authorization:"token "+githubToken,"Content-Type":"application/json",Accept:"application/vnd.github.v3+json"},
+    body:JSON.stringify({description:"NoteVault encrypted vault",public:false,files:{"vault.enc":{content:blob}}})});
+  if(!resp.ok){var ej=await resp.json();showToast("Sync failed: "+ej.message,true);return;}
+  var json=await resp.json();gistId=json.id;await dbPut("settings",{key:"gist_id",value:gistId});
+  await dbPut("settings",{key:"last_synced_at",value:Date.now()});updateSyncIndicator();showToast("Synced!");}
+
+async function syncToGist(){try{var resp=await fetch("https://api.github.com/gists/"+gistId,{headers:{Authorization:"token "+githubToken,Accept:"application/vnd.github.v3+json"}});
+    if(!resp.ok){if(resp.status===404){gistId=null;await dbPut("settings",{key:"gist_id",value:null});return firstSync();}
+      showToast("Sync pull failed",true);return;}
+    var json=await resp.json();var filename=Object.keys(json.files)[0];var content=json.files[filename].content;
+    if(content){try{var parsed=JSON.parse(content);var decrypted=await decryptAES(recoveryKey,{iv:parsed.iv,ciphertext:parsed.data});
+      var vault=JSON.parse(decrypted);await mergeVault(vault);}catch(e){showToast("Sync decrypt failed: wrong passphrase?",true);return;}}
+    var vault2=await getVaultJSON();var plaintext=JSON.stringify(vault2);
+    var encrypted=await encryptAES(recoveryKey,plaintext);
+    var blob=JSON.stringify({v:1,iv:encrypted.iv,data:encrypted.ciphertext});
+    var patchResp=await fetch("https://api.github.com/gists/"+gistId,{method:"PATCH",headers:{Authorization:"token "+githubToken,"Content-Type":"application/json",Accept:"application/vnd.github.v3+json"},
+      body:JSON.stringify({files:{[filename]:{content:blob}}})});
+    if(!patchResp.ok){showToast("Sync push failed",true);return;}
+    await dbPut("settings",{key:"last_synced_at",value:Date.now()});updateSyncIndicator();showToast("Synced!");
+  }catch(e){showToast("Sync error: "+e.message,true);}}
+
+async function getVaultJSON(){var folders=await dbGetAll("folders");var notes=await dbGetAll("notes");
+  return{version:1,folders:folders,notes:notes};}
+
+async function mergeVault(vault){if(!vault||!vault.folders||!vault.notes)return;
+  var localFolders=await dbGetAll("folders");var localNotes=await dbGetAll("notes");
+  var localFolderMap={};localFolders.forEach(function(f){localFolderMap[f.id]=f;});
+  var localNoteMap={};localNotes.forEach(function(n){localNoteMap[n.id]=n;});
+  for(var i=0;i<vault.folders.length;i++){var f=vault.folders[i];var local=localFolderMap[f.id];
+    if(!local||f.updatedAt>local.updatedAt)await dbPut("folders",f);}
+  for(var j=0;j<vault.notes.length;j++){var n=vault.notes[j];var local2=localNoteMap[n.id];
+    if(!local2||n.updatedAt>local2.updatedAt)await dbPut("notes",n);}
+  await refreshFolderTree();}
+
+function updateSyncIndicator(){var dot=document.querySelector("#syncIndicator .sync-dot");var label=document.getElementById("syncLabel");
+  if(!githubToken||!gistId){dot.className="sync-dot never";label.textContent="Offline";return;}
+  if(syncEnabled){dot.className="sync-dot synced";label.textContent="Auto";}else{dot.className="sync-dot never";label.textContent="Manual";}}
+
+// === SETTINGS ===
+async function openSettings(){var modal=document.getElementById("modalContainer");
+  var tokSet=!!githubToken;var gidSet=!!gistId;
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
+    '<h2>Settings</h2>'+
+    '<div class=settings-row><label>GitHub Token</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="setGithubToken()">'+(tokSet?"Change":"Set")+'</button></div>'+
+    '<div class=settings-row><label>Gist ID</label><span style="font-size:12px;color:var(--text2);">'+(gidSet?gistId:"Not synced")+'</span></div>'+
+    '<div class=settings-row><label>Sync Status</label><span style="font-size:12px;color:var(--text2);">'+(syncEnabled?"Enabled":"Disabled")+'</span></div>'+
+    '<div class=settings-row><label>Auto-sync</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="toggleAutoSync()">'+(syncEnabled?"On":"Off")+'</button></div>'+
+    '<div class=settings-row><label>Export vault</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="exportVault()">JSON</button>'+
+    '<button class="btn btn-sm btn-ghost" onclick="exportEncryptedVault()">Encrypted</button></div>'+
+    '<div class=settings-row><label>Import vault</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="importVault()">JSON</button></div>'+
+    '<div class=settings-row><label>Change passphrase</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="changePassphrase()">Change</button></div>'+
+    '<div class=modal-actions>'+
+    '<button class=btn onclick="document.getElementById(\'modalContainer\').innerHTML=\'\'">Close</button>'+
+    '</div></div></div>';}
+
+async function setGithubToken(){var token=prompt("Enter GitHub personal access token (classic, 'gist' scope):");if(!token||!token.trim())return;
+  githubToken=token.trim();var encTok=await encryptAESString(recoveryKey,githubToken);
+  await dbPut("settings",{key:"github_token_encrypted",value:encTok});showToast("Token saved");}
+
+async function toggleAutoSync(){syncEnabled=!syncEnabled;await dbPut("settings",{key:"auto_sync",value:syncEnabled});
+  updateSyncIndicator();openSettings();showToast("Auto-sync "+(syncEnabled?"on":"off"));}
+
+function scheduleAutoSync(){if(!syncEnabled||!githubToken||!gistId)return;clearTimeout(autoSyncTimer);autoSyncTimer=setTimeout(function(){if(currentNoteId)saveCurrentNote();manualSync();},3000);}
+
+// === EXPORT / IMPORT ===
+async function exportVault(){var vault=await getVaultJSON();var blob=new Blob([JSON.stringify(vault,null,2)],{type:"application/json"});
+  var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="notevault-export-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();URL.revokeObjectURL(url);showToast("Exported");}
+
+async function exportEncryptedVault(){if(!recoveryKey){showToast("Unlock first",true);return;}
+  var vault=await getVaultJSON();var plaintext=JSON.stringify(vault);
+  var encrypted=await encryptAES(recoveryKey,plaintext);
+  var blob=new Blob([JSON.stringify({v:1,iv:encrypted.iv,data:encrypted.ciphertext})],{type:"application/json"});
+  var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="notevault-encrypted-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();URL.revokeObjectURL(url);showToast("Encrypted export saved");}
+
+function importVault(){var input=document.createElement("input");input.type="file";input.accept=".json";
+  input.onchange=async function(){var file=input.files[0];if(!file)return;
+    var text=await file.text();try{var data=JSON.parse(text);
+      if(data.v&&data.iv&&data.data){if(!recoveryKey){showToast("Unlock first to import encrypted vault",true);return;}
+        var decrypted=await decryptAES(recoveryKey,{iv:data.iv,ciphertext:data.data});
+        await mergeVault(JSON.parse(decrypted));showToast("Encrypted vault imported");
+      }else{await mergeVault(data);showToast("Vault imported");}
+    }catch(e){showToast("Invalid file: "+e.message,true);}};
+  input.click();}
+
+// === KEYBOARD SHORTCUTS ===
+document.addEventListener("keydown",function(e){if(isLocked)return;
+  if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();if(currentNoteId)saveCurrentNote();}
+  if((e.ctrlKey||e.metaKey)&&e.key==="n"){e.preventDefault();createNote();}
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==="F"){e.preventDefault();createRootFolder();}
+  if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();document.getElementById("searchInput").focus();}
+});
+
+// === INIT ===
+async function init(){await openDB();await initTheme();var autoSync=await dbGet("settings","auto_sync");if(autoSync)syncEnabled=autoSync.value;
+  if(location.protocol!=="file:"){if("serviceWorker"in navigator){try{await navigator.serviceWorker.register("sw.js");}catch(e){}}}
+  var setup=await isSetup();
+  if(!setup){await showSetup();}else{await showUnlock();}
+  document.addEventListener("click",function(e){var menu=document.getElementById("contextMenu");
+    if(menu&&!menu.contains(e.target))menu.style.display="none";});}
+
+init();
+</script>
+</body>
+</html>
