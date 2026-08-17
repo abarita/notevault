@@ -363,8 +363,8 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
     children.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(f){var cid=f.id;var isExp=expandedFolders.has(cid);
       var childCount=folders.filter(function(cf){return cf.parentId===cid;}).length;
       var hasChildren=childCount>0;var noteCount=noteCounts[cid]||0;
-      html+='<div class="tree-item drop-target" id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="selectFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
-        '<span class=tree-arrow onclick="event.stopPropagation();toggleFolder(\''+cid+'\')">'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
+      html+='<div class="tree-item drop-target" id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="event.stopPropagation();toggleFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
+        '<span class=tree-arrow>'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
         '<span class=tree-icon>'+(isExp?"\uD83D\uDCC2":"\uD83D\uDCC1")+'</span>'+
         '<span class=tree-name>'+escapeHtml(f.name)+'</span>'+
         (noteCount?'<span class=tree-badge>'+noteCount+'</span>':"")+
@@ -395,7 +395,7 @@ function selectFolder(id){currentFolderId=id;currentNoteId=null;document.getElem
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";refreshFolderTree();}
 
 async function createNoteInFolder(fid){var id=crypto.randomUUID();var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
-  await dbPut("notes",note);refreshFolderTree();loadNote(id);}
+  await dbPut("notes",note);if(fid)expandedFolders.add(fid);refreshFolderTree();loadNote(id);}
 async function createNote(){await createNoteInFolder(currentFolderId);}
 
 async function createSubfolder(parentId){var name=prompt("Folder name:");if(!name||!name.trim())return;
