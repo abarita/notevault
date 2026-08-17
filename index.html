@@ -111,6 +111,13 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .json-copy-path { opacity: 0; font-size: 10px; color: var(--text3); cursor: pointer; margin-left: 4px; padding: 0 4px; border-radius: 3px; flex-shrink: 0; }
 .json-line:hover .json-copy-path { opacity: 1; }
 .json-copy-path:hover { background: var(--surface2); color: var(--accent); }
+.json-filter-bar { padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.json-filter-bar input { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; font-size: 12px; font-family: 'Cascadia Code','Fira Code','Consolas',monospace; outline: none; }
+.json-filter-bar input:focus { border-color: var(--accent); }
+.json-filter-bar .filter-count { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.json-node.hidden { display: none; }
+.json-node.match-highlight .json-key-name { background: rgba(137,180,250,0.3); border-radius: 2px; }
+.json-val-string mark, .json-val-number mark, .json-key-name mark { background: var(--warning); color: var(--bg); border-radius: 2px; padding: 0 1px; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); text-align: center; padding: 32px; }
 .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
 .empty-state h2 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
@@ -319,6 +326,9 @@ function renderNode(parent,val,path,isRoot){var line=document.createElement("div
     wrapper2.appendChild(header2);wrapper2.appendChild(childrenDiv2);parent.appendChild(wrapper2);return;}
   line.innerHTML='<span>'+escapeHtml(String(val))+'</span>';parent.appendChild(line);}
 
+function filterJSONTree(){var filter=document.getElementById("jsonFilter");var count=document.getElementById("filterCount");var container=document.getElementById("jsonTreeContainer");if(!filter||!container)return;var q=filter.value.toLowerCase().trim();var nodes=container.querySelectorAll(".json-node");var visible=0;nodes.forEach(function(n){var txt=n.textContent.toLowerCase();var match=txt.indexOf(q)>=0;if(!q){n.classList.remove("hidden");n.classList.remove("match-highlight");highlightMarks(n,"");if(n.querySelector(".json-toggle"))n.querySelector(".json-toggle").textContent=n.querySelector(".json-toggle").textContent.replace("\\u25bc","\\u25bc").replace("\\u25b6","\\u25b6");visible++;}else if(match){n.classList.remove("hidden");n.classList.add("match-highlight");highlightMarks(n,q);expandNode(n);visible++;}else{n.classList.add("hidden");n.classList.remove("match-highlight");}});if(count)count.textContent=q?(visible+" of "+nodes.length):"";if(!q)container.querySelectorAll(".json-preview").forEach(function(p){p.style.display="";});}
+function highlightMarks(node,q){node.querySelectorAll("mark").forEach(function(m){m.replaceWith(m.textContent);});if(!q)return;node.querySelectorAll(".json-key-name,.json-val-string,.json-val-number").forEach(function(el){var txt=el.textContent;var idx=txt.toLowerCase().indexOf(q);if(idx>=0){var before=txt.substring(0,idx);var match=txt.substring(idx,idx+q.length);var after=txt.substring(idx+q.length);el.innerHTML=escapeHtml(before)+"<mark>"+escapeHtml(match)+"</mark>"+escapeHtml(after);}});}
+function expandNode(node){var p=node;while(p){p.style.display="";if(p.classList.contains("tree-children"))p.classList.remove("collapsed");var toggle=p.querySelector(".json-toggle");if(toggle){toggle.textContent="\\u25bc";var preview=p.querySelector(".json-preview");if(preview)preview.style.display="none";var closeBracket=p.querySelector(".json-bracket:last-child");if(closeBracket&&closeBracket.textContent==="}"||closeBracket.textContent==="]"){}}p=p.parentElement&&p.parentElement.classList.contains("json-node")?p.parentElement:null;}}
 function renderContent(content,format){if(format==="markdown"){if(typeof marked!=="undefined"){try{marked.use({breaks:true,gfm:true});}catch(e){try{marked.setOptions({breaks:true,gfm:true});}catch(e2){}}return marked.parse(content);}return"<pre>"+escapeHtml(content)+"</pre>";}
   if(format==="json"){try{var parsed=JSON.parse(content);var tree=renderJSONTree(parsed);return tree.outerHTML;}catch(_){return '<pre><code>'+escapeHtml(content)+'</code></pre>';}}
   if(format==="xml")return'<pre><code>'+highlightXML(content)+'</code></pre>';
@@ -329,7 +339,8 @@ function updatePreview(){var content=document.getElementById("editor").value;var
   var detected=document.getElementById("detectedFormat");
   if(!content.trim()&&!currentNoteId){preview.innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';detected.textContent="";return;}
   var actualFormat=fs==="auto"?detectFormat(content):fs;detected.textContent="Detected: "+actualFormat;
-  preview.innerHTML=renderContent(content,actualFormat);
+  if(actualFormat==="json"){preview.innerHTML='<div class=json-filter-bar><input id=jsonFilter placeholder="Filter JSON keys/values..." oninput="filterJSONTree()"><span class=filter-count id=filterCount></span></div><div id=jsonTreeContainer>'+renderContent(content,actualFormat)+'</div>';}
+  else{preview.innerHTML=renderContent(content,actualFormat);}
   if(actualFormat==="markdown")renderMermaidDiagrams();
   document.getElementById("charCount").textContent=content.length+" chars";}
 
