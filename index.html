@@ -187,7 +187,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div style="padding:6px 8px;">
     <input class="search-input" id="searchInput" placeholder="Search..." oninput="onSearch()" style="width:100%;">
   </div>
-  <div class="folder-tree" id="folderTree" oncontextmenu="rootFolderContext(event)" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,null)"></div>
+  <div class="folder-tree" id="folderTree" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,null)"></div>
   <div class="stats" id="stats">0 notes</div>
 </div>
 
@@ -363,7 +363,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
     children.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(f){var cid=f.id;var isExp=expandedFolders.has(cid);
       var childCount=folders.filter(function(cf){return cf.parentId===cid;}).length;
       var hasChildren=childCount>0;var noteCount=noteCounts[cid]||0;
-      html+='<div class="tree-item drop-target" id="tree-folder-'+cid+'" data-folder="'+cid+'" onclick="event.stopPropagation();toggleFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
+      html+='<div class="tree-item drop-target" id="tree-folder-'+cid+'" data-folder="'+cid+'" onclick="event.stopPropagation();toggleFolder(\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
         '<span class=tree-arrow>'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
         '<span class=tree-icon>'+(isExp?"\uD83D\uDCC2":"\uD83D\uDCC1")+'</span>'+
         '<span class=tree-name>'+escapeHtml(f.name)+'</span>'+
@@ -376,7 +376,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
       html+='<div class="tree-children'+(isExp?"":" collapsed")+'" id="tree-children-'+cid+'">'+childHtml+'</div>';
     });
     folderNotes.sort(function(a,b){return b.updatedAt-a.updatedAt;}).forEach(function(n){var fmt=n.format==="auto"?detectFormat(n.content):n.format;
-      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id="tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')" draggable="true" ondragstart="dragStart(event,\''+n.id+'\')" ondragend="dragEnd(event)">'+
+      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id="tree-note-'+n.id+'" data-note="'+n.id+'" onclick="loadNote(\''+n.id+'\')" draggable="true" ondragstart="dragStart(event,\''+n.id+'\')" ondragend="dragEnd(event)">'+
         '<span class=tree-arrow></span>'+
         '<span class=tree-icon>\uD83D\uDCC4</span>'+
         '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'<span class=tree-time>created '+timeAgo(n.createdAt)+' · updated '+timeAgo(n.updatedAt)+'</span></span>'+
@@ -823,7 +823,13 @@ async function init(){await openDB();await initTheme();var autoSync=await dbGet(
   var setup=await isSetup();
   if(!setup){await showSetup();}else{await showUnlock();}
   document.addEventListener("click",function(e){var menu=document.getElementById("contextMenu");
-    if(menu&&!menu.contains(e.target))menu.style.display="none";});}
+    if(menu&&!menu.contains(e.target))menu.style.display="none";});
+  document.getElementById("folderTree").addEventListener("contextmenu",function(e){
+    var noteEl=e.target.closest("[data-note]");var folderEl=e.target.closest("[data-folder]");
+    if(noteEl){noteContext(e,noteEl.getAttribute("data-note"));}
+    else if(folderEl){folderContext(e,folderEl.getAttribute("data-folder"));}
+    else{rootFolderContext(e);}
+  });}
 
 init();
 </script>
