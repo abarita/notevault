@@ -54,6 +54,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .tree-arrow:hover { color: var(--text); }
 .tree-icon { opacity: 0.6; font-size: 14px; flex-shrink: 0; }
 .tree-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-time { display: block; font-size: 10px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .tree-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface3); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); flex-shrink: 0; }
 .tree-actions { display: none; gap: 2px; flex-shrink: 0; }
 .tree-item:hover .tree-actions { display: flex; }
@@ -376,7 +377,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
       html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id=tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')">'+
         '<span class=tree-arrow></span>'+
         '<span class=tree-icon>\uD83D\uDCC4</span>'+
-        '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'</span>'+
+        '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'<span class=tree-time>created '+timeAgo(n.createdAt)+' · updated '+timeAgo(n.updatedAt)+'</span></span>'+
         '<span class=tree-badge>'+fmt+'</span>'+
         '</div>';
     });
@@ -429,6 +430,7 @@ function rootFolderContext(e){e.preventDefault();showContextMenu(e,[
 ]);}
 function noteContext(e,id){e.preventDefault();showContextMenu(e,[
   {label:"Rename",action:function(){currentNoteId=id;renameNote();}},
+  {label:"Move to folder",action:function(){currentNoteId=id;showMoveNoteModal();}},
   {label:"Delete note",action:function(){currentNoteId=id;deleteCurrentNote();},danger:true}
 ]);}
 function showContextMenu(e,items){var menu=document.getElementById("contextMenu");
@@ -455,9 +457,30 @@ async function renameNote(){if(!currentNoteId)return;var note=await dbGet("notes
   var name=prompt("Rename note:",note.title);if(!name||!name.trim())return;
   note.title=name.trim();note.customTitle=true;note.updatedAt=Date.now();await dbPut("notes",note);refreshFolderTree();showToast("Renamed");}
 
+async function showMoveNoteModal(){var folders=await dbGetAll("folders");var note=await dbGet("notes",currentNoteId);if(!note)return;
+  var currentFolder=note.folderId||null;var modal=document.getElementById("modalContainer");
+  var folderList=folders.map(function(f){var isCurrent=f.id===currentFolder;
+    return'<div class="context-menu-item" style="cursor:pointer;'+(isCurrent?'opacity:0.5;':'')+'" onclick="moveNoteTo(\''+f.id+'\')">'+(isCurrent?'\\u2714 ':'')+escapeHtml(f.name)+'</div>';
+  }).join("");
+  var rootSelected=currentFolder===null;
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:400px;">'+
+    '<h2>Move note to</h2>'+
+    '<div style="max-height:300px;overflow-y:auto;margin-bottom:8px;">'+
+    '<div class="context-menu-item" style="cursor:pointer;'+(rootSelected?'opacity:0.5;':'')+'" onclick="moveNoteTo(null)">'+(rootSelected?'\\u2714 ':'')+'Root (uncategorized)</div>'+
+    folderList+
+    '</div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="document.getElementById(\'modalContainer\').innerHTML=\'\'">Cancel</button>'+
+    '</div></div></div>';}
+
+async function moveNoteTo(folderId){if(!currentNoteId)return;var note=await dbGet("notes",currentNoteId);if(!note)return;
+  note.folderId=folderId||null;note.updatedAt=Date.now();await dbPut("notes",note);
+  document.getElementById("modalContainer").innerHTML="";refreshFolderTree();showToast("Moved");}
+
 async function deleteCurrentNote(){if(!currentNoteId||!db)return;if(!confirm("Delete this note permanently?"))return;
   await dbDelete("notes",currentNoteId);currentNoteId=null;clearEditor();refreshFolderTree();showToast("Deleted");}
 
+function timeAgo(ts){var diff=Date.now()-ts;var sec=Math.floor(diff/1000);if(sec<60)return"just now";var min=Math.floor(sec/60);if(min<60)return min+"m ago";var hr=Math.floor(min/60);if(hr<24)return hr+"h ago";var days=Math.floor(hr/24);if(days<30)return days+"d ago";return new Date(ts).toLocaleDateString();}
 function clearEditor(){document.getElementById("editor").value="";document.getElementById("formatSelect").value="auto";
   document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";}
