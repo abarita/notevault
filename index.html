@@ -436,9 +436,9 @@ function noteContext(e,id){e.preventDefault();showContextMenu(e,[
   {label:"Delete note",action:function(){currentNoteId=id;deleteCurrentNote();},danger:true}
 ]);}
 function showContextMenu(e,items){var menu=document.getElementById("contextMenu");
-  menu.innerHTML=items.map(function(i){return'<div class="context-menu-item'+(i.danger?" danger":"")+'" id="ctx-'+i.label+'">'+i.label+'</div>';}).join("");
+  menu.innerHTML=items.map(function(i,idx){return'<div class="context-menu-item'+(i.danger?" danger":"")+'" data-idx="'+idx+'">'+i.label+'</div>';}).join("");
   menu.style.display="block";menu.style.left=Math.min(e.clientX,window.innerWidth-170)+"px";menu.style.top=Math.min(e.clientY,window.innerHeight-items.length*40-20)+"px";
-  items.forEach(function(i,idx){var el=document.getElementById("ctx-"+i.label);if(el)el.onclick=function(){menu.style.display="none";i.action();};});
+  var els=menu.querySelectorAll(".context-menu-item");els.forEach(function(el){var idx=parseInt(el.getAttribute("data-idx"));el.onclick=function(ev){ev.stopPropagation();menu.style.display="none";items[idx].action();};});
   setTimeout(function(){document.addEventListener("click",function(){menu.style.display="none";},{once:true});},0);}
 
 // === NOTE OPERATIONS ===
