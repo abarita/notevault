@@ -62,7 +62,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 .tree-item:hover .tree-actions { display: flex; }
 .tree-children { padding-left: 16px; }
 .tree-children.collapsed { display: none; }
-.context-menu { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; z-index: 1000; box-shadow: var(--shadow); min-width: 160px; display: none; }
+.context-menu { position: fixed; background: var(--surface); border: 2px solid var(--danger); border-radius: 8px; padding: 4px; z-index: 9999; box-shadow: var(--shadow); min-width: 160px; display: none; }
 .context-menu-item { padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: var(--text); }
 .context-menu-item:hover { background: var(--surface2); }
 .context-menu-item.danger { color: var(--danger); }
@@ -363,7 +363,7 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
     children.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(f){var cid=f.id;var isExp=expandedFolders.has(cid);
       var childCount=folders.filter(function(cf){return cf.parentId===cid;}).length;
       var hasChildren=childCount>0;var noteCount=noteCounts[cid]||0;
-      html+='<div class="tree-item drop-target" id=tree-folder-'+cid+' data-folder="'+cid+'" onclick="event.stopPropagation();toggleFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
+      html+='<div class="tree-item drop-target" id="tree-folder-'+cid+'" data-folder="'+cid+'" onclick="event.stopPropagation();toggleFolder(\''+cid+'\')" oncontextmenu="folderContext(event,\''+cid+'\')" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,\''+cid+'\')">'+
         '<span class=tree-arrow>'+(hasChildren?(isExp?"\u25bc":"\u25b6"):"")+'</span>'+
         '<span class=tree-icon>'+(isExp?"\uD83D\uDCC2":"\uD83D\uDCC1")+'</span>'+
         '<span class=tree-name>'+escapeHtml(f.name)+'</span>'+
@@ -373,10 +373,10 @@ async function refreshFolderTree(){var folders=await dbGetAll("folders");var not
         '<button class=btn-icon title="Add subfolder" onclick="event.stopPropagation();createSubfolder(\''+cid+'\')">\uD83D\uDCC1</button>'+
         '</span></div>';
       var childHtml=buildTree(cid,level+1);
-      html+='<div class="tree-children'+(isExp?"":" collapsed")+'" id=tree-children-'+cid+'>'+childHtml+'</div>';
+      html+='<div class="tree-children'+(isExp?"":" collapsed")+'" id="tree-children-'+cid+'">'+childHtml+'</div>';
     });
     folderNotes.sort(function(a,b){return b.updatedAt-a.updatedAt;}).forEach(function(n){var fmt=n.format==="auto"?detectFormat(n.content):n.format;
-      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id=tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')" draggable="true" ondragstart="dragStart(event,\''+n.id+'\')" ondragend="dragEnd(event)">'+
+      html+='<div class="tree-item'+(n.id===currentNoteId?" active":"")+'" id="tree-note-'+n.id+'" onclick="loadNote(\''+n.id+'\')" oncontextmenu="noteContext(event,\''+n.id+'\')" draggable="true" ondragstart="dragStart(event,\''+n.id+'\')" ondragend="dragEnd(event)">'+
         '<span class=tree-arrow></span>'+
         '<span class=tree-icon>\uD83D\uDCC4</span>'+
         '<span class=tree-name>'+escapeHtml(n.title||"Untitled")+'<span class=tree-time>created '+timeAgo(n.createdAt)+' · updated '+timeAgo(n.updatedAt)+'</span></span>'+
