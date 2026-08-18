@@ -281,6 +281,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   <div class="sidebar-header">
     <h1>NoteVault</h1>
     <div style="display:flex;gap:4px;">
+      <button class="btn-icon" onclick="showHelpModal()" title="Help & User Guide" id="helpBtn">?</button>
       <button class="btn-icon" onclick="lockVault()" title="Lock Vault" id="lockBtn">&#128274;</button>
       <button class="btn-icon" onclick="openSettings()" title="Settings">&#9881;</button>
       <button class="btn btn-sm btn-ghost" onclick="createRootFolder()" title="New folder">&#128193;+</button>
@@ -1480,10 +1481,98 @@ async function openSettings(){var modal=document.getElementById("modalContainer"
     '<button class="btn btn-sm btn-ghost" onclick="importVault()">JSON</button></div>'+
     '<div class=settings-row><label>Change passphrase</label>'+
     '<button class="btn btn-sm btn-ghost" onclick="changePassphrase()">Change</button></div>'+
+    '<div class=settings-row><label>User Guide & Mobile Transfer</label>'+
+    '<button class="btn btn-sm btn-ghost" onclick="showHelpModal()">View Guide</button></div>'+
     '<div class=modal-actions>'+
     '<button class="btn btn-ghost btn-danger" onclick="lockVault()" style="margin-right:auto;">Lock Vault</button>'+
     '<button class=btn onclick="closeModal()">Close</button>'+
     '</div></div></div>';}
+
+function showHelpModal(activeTab){
+  activeTab = activeTab || "mobile";
+  var modal=document.getElementById("modalContainer");
+
+  var tabsHeader = '<div style="display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;">'+
+    '<button class="btn btn-sm '+(activeTab==='mobile'?'':'btn-ghost')+'" onclick="showHelpModal(\'mobile\')">📱 Mobile &amp; Telegram</button>'+
+    '<button class="btn btn-sm '+(activeTab==='sync'?'':'btn-ghost')+'" onclick="showHelpModal(\'sync\')">🔄 Cloud Sync</button>'+
+    '<button class="btn btn-sm '+(activeTab==='features'?'':'btn-ghost')+'" onclick="showHelpModal(\'features\')">⌨️ Features &amp; Shortcuts</button>'+
+    '<button class="btn btn-sm '+(activeTab==='security'?'':'btn-ghost')+'" onclick="showHelpModal(\'security\')">🔒 Cryptography</button>'+
+  '</div>';
+
+  var tabContent = "";
+  if(activeTab === "mobile"){
+    tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
+      '<div><strong style="color:var(--accent);">Method 1: Transfer via Telegram (100% Offline Standalone File)</strong>'+
+      '<ol style="padding-left:18px;margin-top:6px;">'+
+      '<li>Send <code>index.html</code> (or renamed <code>NoteVault.html</code>) from your computer to Telegram <strong>Saved Messages</strong> as a <em>Document / File</em>.</li>'+
+      '<li><strong>Android</strong>: Tap file ➔ Save to Downloads ➔ Open in Chrome, Firefox, or Brave (can be added to Home Screen).</li>'+
+      '<li><strong>iPhone (iOS)</strong>: Tap file ➔ Share icon ➔ Save to Files ➔ Tap the file to open in Safari.</li>'+
+      '</ol></div>'+
+      '<div><strong style="color:var(--accent);">Method 2: GitHub Pages PWA (Recommended for Mobile)</strong>'+
+      '<ol style="padding-left:18px;margin-top:6px;">'+
+      '<li>In your GitHub repo: <strong>Settings ➔ Pages ➔ Source: Deploy from branch (master / root)</strong>.</li>'+
+      '<li>Open your GitHub Pages URL (e.g. <code>https://&lt;username&gt;.github.io/notevault/</code>) on your mobile browser.</li>'+
+      '<li>Tap <strong>Share ➔ Add to Home Screen</strong> for a native-like app icon with full offline Service Worker caching.</li>'+
+      '</ol></div>'+
+      '<div><strong style="color:var(--accent);">Mobile View Switcher</strong>'+
+      '<p style="margin-top:4px;">On mobile devices, use the <code>[ ✍️ Edit | 👁️ Preview | ◫ Split ]</code> buttons in the top toolbar to switch between full-screen writing, full-screen reading, or live split view.</p>'+
+      '</div></div>';
+  } else if(activeTab === "sync"){
+    tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
+      '<div><strong style="color:var(--accent);">How Cross-Device Sync Works</strong>'+
+      '<p style="margin-top:4px;">NoteVault syncs an end-to-end encrypted payload (<code>vault.enc</code>) to a private GitHub Gist using your <strong>12-word master recovery key</strong>.</p></div>'+
+      '<div><strong style="color:var(--accent);">Pairing Devices (PC &amp; Phone)</strong>'+
+      '<ol style="padding-left:18px;margin-top:6px;">'+
+      '<li><strong>Step 1</strong>: When opening NoteVault on your second device, click <strong>Recover with 12 words</strong> and enter the same 12 words from your first device.</li>'+
+      '<li><strong>Step 2</strong>: Go to <strong>Settings ➔ GitHub Token</strong>, paste your GitHub Personal Access Token (Classic with <code>gist</code> scope).</li>'+
+      '<li><strong>Step 3</strong>: NoteVault automatically detects and links your Gist, pulling and syncing all notes!</li>'+
+      '</ol></div>'+
+      '<div><strong style="color:var(--accent);">Auto-Sync Timing</strong>'+
+      '<p style="margin-top:4px;">Notes auto-sync 2 seconds after typing stops, or immediately when closing the keyboard, selecting another note, or switching browser tabs.</p></div>'+
+      '</div>';
+  } else if(activeTab === "features"){
+    tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
+      '<div><strong style="color:var(--accent);">Keyboard Shortcuts</strong>'+
+      '<ul style="padding-left:18px;margin-top:4px;">'+
+      '<li><code>Ctrl + N</code> (or <code>Cmd + N</code>): Create new note</li>'+
+      '<li><code>Ctrl + Shift + F</code>: Create new root folder</li>'+
+      '<li><code>Ctrl + K</code>: Focus search</li>'+
+      '<li><code>Ctrl + S</code>: Save note immediately</li>'+
+      '</ul></div>'+
+      '<div><strong style="color:var(--accent);">Multi-Format Rendering</strong>'+
+      '<ul style="padding-left:18px;margin-top:4px;">'+
+      '<li><strong>Markdown</strong>: GFM tables, task lists, code syntax highlighting, blockquotes.</li>'+
+      '<li><strong>JSON Tree</strong>: Collapsible tree view, type color-coding, path copy, real-time query filtering with <code>&lt;mark&gt;</code> tags.</li>'+
+      '<li><strong>XML</strong>: Highlighted XML tags, attributes, and values.</li>'+
+      '<li><strong>Mermaid</strong>: Flowcharts and sequence diagrams in <code>```mermaid</code> blocks.</li>'+
+      '</ul></div>'+
+      '<div><strong style="color:var(--accent);">Draggable Splitters &amp; Sync Scroll</strong>'+
+      '<ul style="padding-left:18px;margin-top:4px;">'+
+      '<li>Drag gutters between panes to resize (double-click resizer to reset to default).</li>'+
+      '<li>Toggle <strong>🔗 Sync Scroll</strong> in toolbar to link/unlink editor and preview scrolling.</li>'+
+      '</ul></div>'+
+      '</div>';
+  } else if(activeTab === "security"){
+    tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
+      '<div><strong style="color:var(--accent);">Zero-Knowledge Cryptography</strong>'+
+      '<ul style="padding-left:18px;margin-top:4px;">'+
+      '<li><strong>AES-256-GCM</strong>: Authenticated symmetric encryption for all notes at rest in IndexedDB and in GitHub Gists.</li>'+
+      '<li><strong>PBKDF2-HMAC-SHA256</strong>: 100,000 key derivation iterations with unique cryptographic salts.</li>'+
+      '<li><strong>BIP39 Standard</strong>: 12-word human-readable master recovery seed (2048 words standard dictionary).</li>'+
+      '<li><strong>Local-First &amp; Offline</strong>: Standalone bundle runs 100% locally with zero external telemetry or tracking.</li>'+
+      '</ul></div>'+
+      '</div>';
+  }
+
+  modal.innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'+
+    '<div class="modal" style="max-width:580px;max-height:85vh;display:flex;flex-direction:column;">'+
+    '<h2>NoteVault User Guide</h2>'+
+    tabsHeader+
+    '<div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:14px;">'+tabContent+'</div>'+
+    '<div class="modal-actions" style="margin-top:auto;">'+
+    '<button class="btn" onclick="closeModal()">Close</button>'+
+    '</div></div></div>';
+}
 
 function setGistIdModal(){
   showPromptModal({
