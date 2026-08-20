@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>NoteVault</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2389b4fa'/%3E%3Cstop offset='100%25' stop-color='%23b4befe'/%3E%3C/linearGradient%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%231e1e2e'/%3E%3Cstop offset='100%25' stop-color='%23282840'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23bg)' stroke='%2345475a' stroke-width='1'/%3E%3Cpath d='M8 6h11l5 5v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z' fill='none' stroke='url(%23g)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 6v5h5' fill='none' stroke='url(%23g)' stroke-width='1.5' stroke-linejoin='round'/%3E%3Crect x='11' y='16' width='10' height='7' rx='1.5' fill='%2389b4fa'/%3E%3Cpath d='M13.5 16v-2.5a2.5 2.5 0 0 1 5 0V16' fill='none' stroke='%2389b4fa' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='19.5' r='1' fill='%231e1e2e'/%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231e1e2e'/%3E%3Cpath d='M25 18h34l16 16v48a6 6 0 0 1-6 6H25a6 6 0 0 1-6-6V24a6 6 0 0 1 6-6z' fill='none' stroke='%2389b4fa' stroke-width='5'/%3E%3Cpath d='M59 18v16h16' fill='none' stroke='%2389b4fa' stroke-width='4'/%3E%3Crect x='34' y='50' width='32' height='24' rx='5' fill='%2389b4fa'/%3E%3Cpath d='M42 50v-8a8 8 0 0 1 16 0v8' fill='none' stroke='%2389b4fa' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='61' r='3.5' fill='%231e1e2e'/%3E%3C/svg%3E">
 <meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#1e1e2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NoteVault">
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22NoteVault%22%2C%22short_name%22%3A%22NoteVault%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%231e1e2e%22%2C%22theme_color%22%3A%22%231e1e2e%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%253Crect%20width%3D'100'%20height%3D'100'%20rx%3D'20'%20fill%3D'%23282840'%2F%3E%253Ctext%20x%3D'50'%20y%3D'65'%20text-anchor%3D'middle'%20font-size%3D'50'%20fill%3D'%2389b4fa'%20font-family%3D'sans-serif'%3EN%253C%2Ftext%3E%253C%2Fsvg%3E%22%2C%22sizes%22%3A%22100x100%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <script>
 // === INLINED MARKED (Markdown Parser) ===
@@ -1459,11 +1462,27 @@ function updateSyncIndicator(){var dot=document.querySelector("#syncIndicator .s
     if(diff<60000)ago="just now";else if(diff<3600000)ago=Math.round(diff/60000)+"m ago";else if(diff<86400000)ago=Math.round(diff/3600000)+"h ago";else ago=Math.round(diff/86400000)+"d ago";
     label.textContent=(syncEnabled?"Auto":"Manual")+" \u00B7 "+ago;}}).catch(function(){});}
 
+// === PWA INSTALL PROMPT ===
+var deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",function(e){
+  e.preventDefault();
+  deferredInstallPrompt=e;
+});
+
+async function triggerPwaInstall(){
+  if(!deferredInstallPrompt)return;
+  deferredInstallPrompt.prompt();
+  var outcome=await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null;
+  closeModal();
+}
+
 // === SETTINGS ===
 async function openSettings(){var modal=document.getElementById("modalContainer");
   var tokSet=!!githubToken;var gidSet=!!gistId;
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
     '<h2>Settings</h2>'+
+    (deferredInstallPrompt?'<div class=settings-row style="background:var(--surface2);padding:10px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Install App</label><button class="btn btn-sm" onclick="triggerPwaInstall()">📲 Install NoteVault</button></div>':'')+
     '<div class=settings-row><label>GitHub Token</label>'+
     '<button class="btn btn-sm btn-ghost" onclick="setGithubToken()">'+(tokSet?"Change":"Set")+'</button></div>'+
     '<div class=settings-row><label>Gist ID</label><div style="display:flex;align-items:center;gap:6px;">'+
