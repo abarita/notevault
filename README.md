@@ -28,20 +28,18 @@
 
 ---
 
-## 📱 Mobile & Telegram Transfer Guide
+## 📱 Mobile Pairing & Transfer Guide
 
 Because NoteVault compiles into a single, self-contained `index.html` file, you can easily transfer and run it on your smartphone.
 
-### Method 1: Send via Telegram (Offline File)
+### ⭐ Method 1: 1-Tap QR Code Pairing (Air-Gapped & Instant)
 
-1. **Send to Telegram**: Send `index.html` (or rename it `NoteVault.html`) from your computer to your Telegram **Saved Messages** as a **Document / File**.
-2. **On Android**:
-   * Tap the file in Telegram ➔ **Save to Downloads**.
-   * Open the file with **Chrome**, **Firefox**, or **Brave**.
-   * *(Optional)* Tap the browser menu (⋮) ➔ **Add to Home screen**.
-3. **On iPhone (iOS)**:
-   * Tap the file in Telegram ➔ Tap the **Share** icon ➔ **Save to Files**.
-   * Open the **Files** app on your iPhone and tap `NoteVault.html` to open it in Safari.
+Pair your PC and phone in 2 seconds with zero typing and complete air-gapped security:
+
+1. **On your PC**: Open NoteVault, go to **Settings (⚙️) ➔ 📱 Generate Pairing QR**.
+2. **On your Phone**: Open NoteVault and tap **"📷 Scan QR to Pair"** on the setup screen.
+3. **Scan the Screen**: Point your phone camera at the QR code on your PC screen.
+4. **Done!**: Your 12 recovery words, encryption key, and GitHub Cloud Sync credentials are automatically transferred. Set a local passphrase for your phone and your notes sync immediately.
 
 ---
 
@@ -56,6 +54,19 @@ Because NoteVault compiles into a single, self-contained `index.html` file, you 
    https://<your-username>.github.io/notevault/
    ```
 4. Tap **Share ➔ Add to Home Screen** to install NoteVault as a standalone app with offline Service Worker support.
+
+---
+
+### Method 3: Send via Telegram (Offline File)
+
+1. **Send to Telegram**: Send `index.html` (or rename it `NoteVault.html`) from your computer to your Telegram **Saved Messages** as a **Document / File**.
+2. **On Android**:
+   * Tap the file in Telegram ➔ **Save to Downloads**.
+   * Open the file with **Chrome**, **Firefox**, or **Brave**.
+   * *(Optional)* Tap the browser menu (⋮) ➔ **Add to Home screen**.
+3. **On iPhone (iOS)**:
+   * Tap the file in Telegram ➔ Tap the **Share** icon ➔ **Save to Files**.
+   * Open the **Files** app on your iPhone and tap `NoteVault.html` to open it in Safari.
 
 ---
 

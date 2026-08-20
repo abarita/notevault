@@ -14,6 +14,8 @@
 <!-- INLINE_VENDOR_START -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <!-- INLINE_VENDOR_END -->
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <style>
@@ -189,6 +191,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 }
 .mobile-backdrop { display: none; position: fixed; inset: 0; background: var(--overlay); z-index: 49; }
 @media (max-width: 768px) { .mobile-backdrop.open { display: block; } }
+@keyframes qrScan { 0% { top: 20px; opacity: 0.8; } 50% { top: calc(100% - 22px); opacity: 1; } 100% { top: 20px; opacity: 0.8; } }
 </style>
 </head>
 <body>
@@ -948,8 +951,11 @@ async function showSetup(){var modal=document.getElementById("modalContainer");
     '<input type=password id=setupPassphrase placeholder="Enter passphrase (min 8 chars)" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')document.getElementById(\'setupPassphraseConfirm\').focus()">'+
     '<input type=password id=setupPassphraseConfirm placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')startSetup()">'+
     '<div id=setupError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
-    '<div class=modal-actions style="justify-content:space-between;align-items:center;">'+
-    '<button class="btn btn-ghost" onclick="showRestoreExistingVault()" style="color:var(--accent);font-size:12px;padding:6px 10px;">🔄 Restore with 12 words</button>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+    '<button class="btn btn-ghost" onclick="showQrScannerModal()" style="color:var(--accent);font-size:12px;padding:6px 10px;">📷 Scan QR to Pair</button>'+
+    '<button class="btn btn-ghost" onclick="showRestoreExistingVault()" style="color:var(--text2);font-size:12px;padding:6px 10px;">🔄 12 Words</button>'+
+    '</div>'+
     '<div style="display:flex;gap:6px;"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'+
     '<button class=btn id=setupNextBtn onclick="startSetup()">Next</button></div>'+
     '</div></div></div>';}
@@ -957,15 +963,17 @@ async function showSetup(){var modal=document.getElementById("modalContainer");
 async function showRestoreExistingVault(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
     '<h2>Restore Existing Vault</h2>'+
-    '<p>Enter the 12 recovery words from your other device, and set a passphrase for this device.</p>'+
+    '<p>Enter the 12 recovery words from your other device, or scan a pairing QR code.</p>'+
     '<textarea id=restoreWords rows=3 placeholder="Enter all 12 words separated by spaces" style="font-family:monospace;"></textarea>'+
     '<input type=password id=restorePassphrase placeholder="Passphrase for this device (min 8 chars)" autocomplete="new-password" style="margin-top:8px;" onkeydown="if(event.key===\'Enter\')document.getElementById(\'restorePassphraseConfirm\').focus()">'+
     '<input type=password id=restorePassphraseConfirm placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')doRestoreExistingVault()">'+
     '<div id=restoreError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
-    '<div class=modal-actions>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'+
+    '<button class="btn btn-ghost" onclick="showQrScannerModal()" style="color:var(--accent);font-size:12px;">📷 Scan QR Code</button>'+
+    '<div style="display:flex;gap:6px;">'+
     '<button class="btn btn-ghost" onclick="showSetup()">Back</button>'+
     '<button class=btn id=restoreSubmitBtn onclick="doRestoreExistingVault()">Restore Vault</button>'+
-    '</div></div></div>';}
+    '</div></div></div></div>';}
 
 async function doRestoreExistingVault(){
   var wordsInput=document.getElementById("restoreWords").value.trim().split(/\s+/);
@@ -1009,6 +1017,8 @@ async function doRestoreExistingVault(){
     recoveryKey=rKey;
     var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
     await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+    var encWords=await encryptAESString(passphraseKey,JSON.stringify(wordsInput));
+    await dbPut("settings",{key:"recovery_words_encrypted",value:encWords});
     var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
     await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
     var verify=await encryptAESString(recoveryKey,"notevault-verify");
@@ -1055,6 +1065,8 @@ async function startSetup(){var pw=document.getElementById("setupPassphrase").va
   recoveryKey=await deriveRecoveryKey(words);
   var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
   await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+  var encWords=await encryptAESString(passphraseKey,JSON.stringify(words));
+  await dbPut("settings",{key:"recovery_words_encrypted",value:encWords});
   var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
   await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
   var verify=await encryptAESString(recoveryKey,"notevault-verify");
@@ -1067,7 +1079,8 @@ function showRecoveryWords(words){var modal=document.getElementById("modalContai
     '<p style="color:var(--warning);">Write these 12 words down on paper and store them safely. You will need them to recover your notes if you forget your passphrase.</p>'+
     '<div class=recovery-words>'+words.map(function(w,i){return'<div class=recovery-word><span class=index>'+(i+1)+'</span>'+w+'</div>';}).join("")+'</div>'+
     '<p style="font-size:12px;color:var(--text3);">Warning: If you lose both your passphrase and recovery key, your data cannot be recovered.</p>'+
-    '<div class=modal-actions>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'+
+    '<button class="btn btn-ghost" onclick="showPairDeviceModal()" style="font-size:12px;">📱 Pair Phone (QR)</button>'+
     '<button class=btn id=confirmRecoveryBtn onclick="verifyRecoveryWords()">I\'ve written them down</button>'+
     '</div></div></div>';}
 
@@ -1467,6 +1480,326 @@ function updateSyncIndicator(){var dot=document.querySelector("#syncIndicator .s
     if(diff<60000)ago="just now";else if(diff<3600000)ago=Math.round(diff/60000)+"m ago";else if(diff<86400000)ago=Math.round(diff/3600000)+"h ago";else ago=Math.round(diff/86400000)+"d ago";
     label.textContent=(syncEnabled?"Auto":"Manual")+" \u00B7 "+ago;}}).catch(function(){});}
 
+// === QR CODE PAIRING SYSTEM ===
+var qrScannerStream=null;
+var qrScannerAnimId=null;
+var qrScannedPayload=null;
+
+async function showPairDeviceModal(){
+  if(isLocked||!passphraseKey||!recoveryKey){
+    showToast("Unlock vault first",true);
+    showUnlock();
+    return;
+  }
+
+  var words=null;
+  try{
+    var encWords=await dbGet("settings","recovery_words_encrypted");
+    if(encWords&&encWords.value){
+      var decryptedStr=await decryptAESString(passphraseKey,encWords.value);
+      words=JSON.parse(decryptedStr);
+    }
+  }catch(e){}
+
+  if(!words||!Array.isArray(words)||words.length!==12){
+    showPromptModal({
+      title:"Confirm Recovery Words",
+      message:"To generate a pairing QR code, please enter your 12 recovery words:",
+      placeholder:"12 words separated by spaces",
+      confirmText:"Generate QR",
+      onConfirm:async function(input){
+        var arr=(input||"").trim().split(/\s+/);
+        if(arr.length!==12){
+          showToast("Please enter exactly 12 words",true);
+          return;
+        }
+        var enc=await encryptAESString(passphraseKey,JSON.stringify(arr));
+        await dbPut("settings",{key:"recovery_words_encrypted",value:enc});
+        showPairDeviceModal();
+      }
+    });
+    return;
+  }
+
+  var payload={
+    nv:1,
+    w:words,
+    t:githubToken||"",
+    g:gistId||""
+  };
+
+  var qr=qrcode(0,'M');
+  qr.addData(JSON.stringify(payload));
+  qr.make();
+  var svgTag=qr.createSvgTag(5,10);
+
+  var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'+
+    '<div class="modal" style="max-width:480px;text-align:center;">'+
+    '<h2>📱 Pair Mobile Device</h2>'+
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+
+    'Open NoteVault on your phone and tap <strong>"📷 Scan QR to Pair"</strong> on the setup screen.'+
+    '</p>'+
+    '<div style="background:#ffffff;padding:14px;border-radius:12px;display:inline-block;box-shadow:0 4px 16px rgba(0,0,0,0.25);margin-bottom:12px;">'+
+    svgTag+
+    '</div>'+
+    '<div style="background:var(--surface2);padding:8px 12px;border-radius:6px;font-size:12px;color:var(--text2);margin-bottom:14px;text-align:left;line-height:1.5;">'+
+    '<div>✓ <strong>12 Recovery Words</strong>: Included</div>'+
+    '<div>'+(githubToken?'✓ <strong>GitHub Cloud Sync</strong>: Included':'○ <strong>GitHub Cloud Sync</strong>: Not configured')+'</div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--warning);margin-bottom:16px;">'+
+    '🔒 <em>Air-Gapped Optical Transfer:</em> No credentials are sent over chat or internet.'+
+    '</div>'+
+    '<div class="modal-actions" style="justify-content:center;">'+
+    '<button class="btn" onclick="closeModal()">Done</button>'+
+    '</div></div></div>';
+}
+
+function showQrScannerModal(){
+  var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class="modal-overlay">'+
+    '<div class="modal" style="max-width:460px;text-align:center;">'+
+    '<h2>📷 Scan Pairing QR Code</h2>'+
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+
+    'Point your camera at the NoteVault QR code on your PC screen.'+
+    '</p>'+
+    '<div style="position:relative;width:100%;max-width:320px;height:240px;margin:0 auto 12px;background:#000;border-radius:10px;overflow:hidden;border:2px solid var(--accent);">'+
+    '<video id="qrVideo" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;"></video>'+
+    '<div style="position:absolute;inset:20px;border:2px dashed var(--accent);border-radius:8px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,0.45);"></div>'+
+    '<div id="qrScanLine" style="position:absolute;left:20px;right:20px;top:20px;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:qrScan 2s infinite ease-in-out;"></div>'+
+    '</div>'+
+    '<div id="qrScanStatus" style="font-size:12px;color:var(--text2);margin-bottom:12px;">Initializing camera...</div>'+
+    '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;">'+
+    '<label class="btn btn-sm btn-ghost" style="cursor:pointer;">'+
+    '📁 Upload QR Image <input type="file" accept="image/*" id="qrFileInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
+    '</label>'+
+    '</div>'+
+    '<div class="modal-actions" style="justify-content:center;">'+
+    '<button class="btn btn-ghost" onclick="stopQrScannerAndClose()">Cancel</button>'+
+    '</div></div></div>';
+
+  startQrScanner();
+}
+
+async function startQrScanner(){
+  var video=document.getElementById("qrVideo");
+  var status=document.getElementById("qrScanStatus");
+  if(!video)return;
+
+  try{
+    qrScannerStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"}}
+    });
+    video.srcObject=qrScannerStream;
+    await video.play();
+    if(status)status.textContent="Scanning for QR code...";
+    scanQrFrameLoop();
+  }catch(err){
+    if(status)status.textContent="Camera unavailable: "+err.message+". You can upload a QR image.";
+  }
+}
+
+function stopQrScanner(){
+  if(qrScannerAnimId){
+    cancelAnimationFrame(qrScannerAnimId);
+    qrScannerAnimId=null;
+  }
+  if(qrScannerStream){
+    qrScannerStream.getTracks().forEach(function(t){t.stop();});
+    qrScannerStream=null;
+  }
+}
+
+function stopQrScannerAndClose(){
+  stopQrScanner();
+  closeModal();
+}
+
+async function scanQrFrameLoop(){
+  var video=document.getElementById("qrVideo");
+  if(!video||video.readyState!==video.HAVE_ENOUGH_DATA){
+    qrScannerAnimId=requestAnimationFrame(scanQrFrameLoop);
+    return;
+  }
+
+  var foundCode=null;
+  if('BarcodeDetector' in window){
+    try{
+      var detector=new BarcodeDetector({formats:['qr_code']});
+      var barcodes=await detector.detect(video);
+      if(barcodes&&barcodes.length>0){
+        foundCode=barcodes[0].rawValue;
+      }
+    }catch(e){}
+  }
+
+  if(!foundCode&&typeof jsQR==="function"){
+    try{
+      var canvas=document.createElement("canvas");
+      canvas.width=video.videoWidth;
+      canvas.height=video.videoHeight;
+      var ctx=canvas.getContext("2d",{willReadFrequently:true});
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      var imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      var result=jsQR(imageData.data,imageData.width,imageData.height);
+      if(result&&result.data){
+        foundCode=result.data;
+      }
+    }catch(e){}
+  }
+
+  if(foundCode){
+    processScannedQrData(foundCode);
+    return;
+  }
+
+  qrScannerAnimId=requestAnimationFrame(scanQrFrameLoop);
+}
+
+function handleQrFileUpload(event){
+  var file=event.target.files&&event.target.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=async function(){
+      var canvas=document.createElement("canvas");
+      canvas.width=img.width;
+      canvas.height=img.height;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0);
+      var imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+
+      var foundCode=null;
+      if('BarcodeDetector' in window){
+        try{
+          var detector=new BarcodeDetector({formats:['qr_code']});
+          var barcodes=await detector.detect(canvas);
+          if(barcodes&&barcodes.length>0)foundCode=barcodes[0].rawValue;
+        }catch(_) {}
+      }
+      if(!foundCode&&typeof jsQR==="function"){
+        var result=jsQR(imageData.data,imageData.width,imageData.height);
+        if(result&&result.data)foundCode=result.data;
+      }
+
+      if(foundCode){
+        processScannedQrData(foundCode);
+      }else{
+        var status=document.getElementById("qrScanStatus");
+        if(status)status.textContent="No valid NoteVault QR code found in image.";
+      }
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function processScannedQrData(rawStr){
+  try{
+    var data=JSON.parse(rawStr);
+    if(!data||data.nv!==1||!Array.isArray(data.w)||data.w.length!==12){
+      throw new Error("Invalid NoteVault QR format");
+    }
+    stopQrScanner();
+    if(navigator.vibrate){try{navigator.vibrate(100);}catch(e){}}
+    qrScannedPayload=data;
+    showCompleteQrPairingModal(data);
+  }catch(err){
+    var status=document.getElementById("qrScanStatus");
+    if(status)status.textContent="Invalid QR code: "+err.message;
+    qrScannerAnimId=requestAnimationFrame(scanQrFrameLoop);
+  }
+}
+
+function showCompleteQrPairingModal(payload){
+  var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class="modal-overlay">'+
+    '<div class="modal" style="max-width:480px;">'+
+    '<h2>Pairing Successful! 🎉</h2>'+
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+
+    'Credentials successfully loaded from QR code:'+
+    '</p>'+
+    '<div style="background:var(--surface2);padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.6;margin-bottom:14px;">'+
+    '<div style="color:var(--green);">✓ <strong>12 Recovery Words</strong>: Loaded</div>'+
+    (payload.t?'<div style="color:var(--green);">✓ <strong>GitHub Cloud Sync</strong>: Connected</div>':'<div style="color:var(--text3);">○ GitHub Sync: Not included</div>')+
+    '</div>'+
+    '<p style="font-size:13px;margin-bottom:8px;">Set a passphrase for this device (min 8 chars):</p>'+
+    '<input type="password" id="qrPassphrase" placeholder="Enter passphrase" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')document.getElementById(\'qrPassphraseConfirm\').focus()">'+
+    '<input type="password" id="qrPassphraseConfirm" placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')finishQrPairing()">'+
+    '<div id="qrPairError" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class="modal-actions">'+
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'+
+    '<button class="btn" id="finishQrPairBtn" onclick="finishQrPairing()">Unlock &amp; Sync</button>'+
+    '</div></div></div>';
+}
+
+async function finishQrPairing(){
+  if(!qrScannedPayload)return;
+  var pw=document.getElementById("qrPassphrase").value;
+  var confirm=document.getElementById("qrPassphraseConfirm").value;
+  var err=document.getElementById("qrPairError");
+
+  if(pw.length<8){
+    err.textContent="Passphrase must be at least 8 characters";
+    err.style.display="";
+    return;
+  }
+  if(pw!==confirm){
+    err.textContent="Passphrases do not match";
+    err.style.display="";
+    return;
+  }
+
+  try{
+    var words=qrScannedPayload.w;
+    var rKey=await deriveRecoveryKey(words);
+    var salt=crypto.randomUUID();
+    await dbPut("settings",{key:"passphrase_salt",value:salt});
+    var recoverySalt="notevault-recovery";
+    await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
+    passphraseKey=await deriveKey(pw,salt);
+    recoveryKey=rKey;
+    var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
+    await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+    var encWords=await encryptAESString(passphraseKey,JSON.stringify(words));
+    await dbPut("settings",{key:"recovery_words_encrypted",value:encWords});
+    var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
+    await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
+    var verify=await encryptAESString(recoveryKey,"notevault-verify");
+    await dbPut("settings",{key:"recovery_verify",value:verify});
+
+    if(qrScannedPayload.t){
+      githubToken=qrScannedPayload.t;
+      var encTok=await encryptAESString(recoveryKey,githubToken);
+      await dbPut("settings",{key:"github_token_encrypted",value:encTok});
+      syncEnabled=true;
+      await dbPut("settings",{key:"auto_sync",value:true});
+    }
+    if(qrScannedPayload.g){
+      gistId=qrScannedPayload.g;
+      await dbPut("settings",{key:"gist_id",value:gistId});
+    }
+
+    await dbPut("settings",{key:"setup_complete",value:true});
+
+    closeModal();
+    isLocked=false;
+    await loadAllNotesDecrypted();
+    await refreshFolderTree();
+    updatePreview();
+    updateSyncIndicator();
+    showToast("Device paired & synced successfully! 🎉");
+
+    if(githubToken){
+      manualSync();
+    }
+  }catch(e){
+    err.textContent="Error completing pairing: "+e.message;
+    err.style.display="";
+  }
+}
+
 // === PWA INSTALL PROMPT ===
 var deferredInstallPrompt=null;
 window.addEventListener("beforeinstallprompt",function(e){
@@ -1488,6 +1821,8 @@ async function openSettings(){var modal=document.getElementById("modalContainer"
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
     '<h2>Settings</h2>'+
     (deferredInstallPrompt?'<div class=settings-row style="background:var(--surface2);padding:10px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Install App</label><button class="btn btn-sm" onclick="triggerPwaInstall()">📲 Install NoteVault</button></div>':'')+
+    '<div class=settings-row style="background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Pair Mobile Device</label>'+
+    '<button class="btn btn-sm" onclick="showPairDeviceModal()">📱 Generate Pairing QR</button></div>'+
     '<div class=settings-row><label>GitHub Token</label>'+
     '<button class="btn btn-sm btn-ghost" onclick="setGithubToken()">'+(tokSet?"Change":"Set")+'</button></div>'+
     '<div class=settings-row><label>Gist ID</label><div style="display:flex;align-items:center;gap:6px;">'+
@@ -1517,7 +1852,7 @@ function showHelpModal(activeTab){
   var modal=document.getElementById("modalContainer");
 
   var tabsHeader = '<div style="display:flex;gap:6px;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;">'+
-    '<button class="btn btn-sm '+(activeTab==='mobile'?'':'btn-ghost')+'" onclick="showHelpModal(\'mobile\')">📱 Mobile &amp; Telegram</button>'+
+    '<button class="btn btn-sm '+(activeTab==='mobile'?'':'btn-ghost')+'" onclick="showHelpModal(\'mobile\')">📱 Mobile &amp; QR Pairing</button>'+
     '<button class="btn btn-sm '+(activeTab==='sync'?'':'btn-ghost')+'" onclick="showHelpModal(\'sync\')">🔄 Cloud Sync</button>'+
     '<button class="btn btn-sm '+(activeTab==='features'?'':'btn-ghost')+'" onclick="showHelpModal(\'features\')">⌨️ Features &amp; Shortcuts</button>'+
     '<button class="btn btn-sm '+(activeTab==='security'?'':'btn-ghost')+'" onclick="showHelpModal(\'security\')">🔒 Cryptography</button>'+
@@ -1526,13 +1861,19 @@ function showHelpModal(activeTab){
   var tabContent = "";
   if(activeTab === "mobile"){
     tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
-      '<div><strong style="color:var(--accent);">Method 1: Transfer via Telegram (100% Offline Standalone File)</strong>'+
+      '<div style="background:var(--surface2);padding:10px 12px;border-radius:8px;"><strong style="color:var(--accent);">⭐ Method 1: 1-Tap QR Code Pairing (Instant &amp; Air-Gapped)</strong>'+
+      '<ol style="padding-left:18px;margin-top:6px;">'+
+      '<li>On your PC: Go to <strong>Settings (⚙️) ➔ 📱 Generate Pairing QR</strong>.</li>'+
+      '<li>On your Phone: Open NoteVault and tap <strong>"📷 Scan QR to Pair"</strong> on the setup screen.</li>'+
+      '<li>Scan the QR code with your camera — your 12 recovery words and GitHub Token are transferred instantly with zero typing!</li>'+
+      '</ol></div>'+
+      '<div><strong style="color:var(--accent);">Method 2: Transfer via Telegram (100% Offline Standalone File)</strong>'+
       '<ol style="padding-left:18px;margin-top:6px;">'+
       '<li>Send <code>index.html</code> (or renamed <code>NoteVault.html</code>) from your computer to Telegram <strong>Saved Messages</strong> as a <em>Document / File</em>.</li>'+
       '<li><strong>Android</strong>: Tap file ➔ Save to Downloads ➔ Open in Chrome, Firefox, or Brave (can be added to Home Screen).</li>'+
       '<li><strong>iPhone (iOS)</strong>: Tap file ➔ Share icon ➔ Save to Files ➔ Tap the file to open in Safari.</li>'+
       '</ol></div>'+
-      '<div><strong style="color:var(--accent);">Method 2: GitHub Pages PWA (Recommended for Mobile)</strong>'+
+      '<div><strong style="color:var(--accent);">Method 3: GitHub Pages PWA (Recommended for Mobile)</strong>'+
       '<ol style="padding-left:18px;margin-top:6px;">'+
       '<li>In your GitHub repo: <strong>Settings ➔ Pages ➔ Source: Deploy from branch (master / root)</strong>.</li>'+
       '<li>Open your GitHub Pages URL (e.g. <code>https://&lt;username&gt;.github.io/notevault/</code>) on your mobile browser.</li>'+

@@ -306,6 +306,30 @@ async function runSuite1(browser) {
     await context.close();
   }
 
+  // === TEST 1.14: QR Code Mobile Pairing Modal & Setup Options ===
+  {
+    console.log("\n  [Test 1.14] QR Code Mobile Pairing Modal & Setup Options");
+    const { context, page } = await setupPage(browser);
+
+    // 1. Verify Setup screen has QR scan and 12 words buttons
+    const scanQrBtnVisible = await page.$eval("button:has-text('Scan QR to Pair')", el => el !== null);
+    const restoreWordsBtnVisible = await page.$eval("button:has-text('12 Words')", el => el !== null);
+    runner.assert(scanQrBtnVisible, "Setup screen displays '📷 Scan QR to Pair' button");
+    runner.assert(restoreWordsBtnVisible, "Setup screen displays '🔄 12 Words' restore button");
+
+    // 2. Complete setup and open QR Pairing Modal
+    await completeSetup(page, "qr-test-passphrase-2026");
+    await page.evaluate(() => showPairDeviceModal());
+    await page.waitForTimeout(400);
+
+    const qrSvgExists = await page.$eval("#modalContainer svg", el => el !== null);
+    const qrModalTitle = await page.$eval("#modalContainer h2", el => el.textContent);
+    runner.assert(qrSvgExists, "Pairing QR Code SVG generated and rendered in modal");
+    runner.assert(qrModalTitle.includes("Pair Mobile Device"), "Pair Mobile Device modal is displayed");
+
+    await context.close();
+  }
+
   return runner.summary();
 }
 

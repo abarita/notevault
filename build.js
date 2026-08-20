@@ -21,6 +21,8 @@ function build() {
   // Read vendor scripts
   const markedPath = path.join(__dirname, "node_modules", "marked", "lib", "marked.umd.js");
   const purifyPath = path.join(__dirname, "node_modules", "dompurify", "dist", "purify.min.js");
+  const qrcodePath = path.join(__dirname, "node_modules", "qrcode-generator", "dist", "qrcode.js");
+  const jsqrPath = path.join(__dirname, "node_modules", "jsqr", "dist", "jsQR.js");
 
   if (!fs.existsSync(markedPath)) {
     console.error("Error: marked not found at " + markedPath + ". Run npm install first.");
@@ -30,9 +32,19 @@ function build() {
     console.error("Error: dompurify not found at " + purifyPath + ". Run npm install first.");
     process.exit(1);
   }
+  if (!fs.existsSync(qrcodePath)) {
+    console.error("Error: qrcode-generator not found at " + qrcodePath + ". Run npm install first.");
+    process.exit(1);
+  }
+  if (!fs.existsSync(jsqrPath)) {
+    console.error("Error: jsqr not found at " + jsqrPath + ". Run npm install first.");
+    process.exit(1);
+  }
 
   const markedJs = fs.readFileSync(markedPath, "utf8");
   const purifyJs = fs.readFileSync(purifyPath, "utf8");
+  const qrcodeJs = fs.readFileSync(qrcodePath, "utf8");
+  const jsqrJs = fs.readFileSync(jsqrPath, "utf8");
 
   const inlinedVendors = [
     "<script>",
@@ -40,6 +52,10 @@ function build() {
     markedJs,
     "// === INLINED DOMPURIFY (XSS Sanitizer) ===",
     purifyJs,
+    "// === INLINED QRCODE-GENERATOR ===",
+    qrcodeJs,
+    "// === INLINED JSQR (QR Scanner Decoder) ===",
+    jsqrJs,
     "</script>"
   ].join("\n");
 
@@ -49,7 +65,7 @@ function build() {
     process.exit(1);
   }
 
-  html = html.replace(vendorRegex, inlinedVendors);
+  html = html.replace(vendorRegex, () => inlinedVendors);
 
   // Write root index.html (for direct double-click usage)
   fs.writeFileSync(outPath, html, "utf8");

@@ -296,6 +296,31 @@ async function runUnitTests() {
   assertEq(encryptedExportSchema.iv.length, 12, "Encrypted export contains 12-byte IV array");
   assert(encryptedExportSchema.data.length > 0, "Encrypted export contains ciphertext array");
 
+  console.log("\n=== QR Code Pairing Payload & Generator ===");
+  const qrcodeGen = require("./node_modules/qrcode-generator/dist/qrcode.js");
+  const testPairWords = generateRecoveryKey();
+  const testQrPayload = {
+    nv: 1,
+    w: testPairWords,
+    t: "ghp_testToken1234567890abcdef",
+    g: "gist1234567890abcdef"
+  };
+  const qrStr = JSON.stringify(testQrPayload);
+  const qrObj = qrcodeGen(0, 'M');
+  qrObj.addData(qrStr);
+  qrObj.make();
+  assert(qrObj.getModuleCount() > 20, "QR code modules generated successfully");
+  const svgOutput = qrObj.createSvgTag(4, 8);
+  assert(svgOutput.startsWith("<svg") && svgOutput.endsWith("</svg>"), "QR SVG output is valid XML SVG element");
+  assert(svgOutput.includes("viewBox="), "QR SVG includes viewBox scaling attribute");
+
+  // Verify decoded payload structure
+  const parsedPayload = JSON.parse(qrStr);
+  assertEq(parsedPayload.nv, 1, "Pairing payload version is 1");
+  assertEq(parsedPayload.w.length, 12, "Pairing payload contains exactly 12 recovery words");
+  assertEq(parsedPayload.t, "ghp_testToken1234567890abcdef", "Pairing payload contains GitHub token");
+  assertEq(parsedPayload.g, "gist1234567890abcdef", "Pairing payload contains Gist ID");
+
   console.log("\n=================================");
   console.log("       UNIT TESTS SUMMARY        ");
   console.log("=================================");

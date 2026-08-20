@@ -21,7 +21,10 @@
   "homepage": "https://github.com/abarita/notevault#readme",
   "dependencies": {
     "dompurify": "^3.4.13",
+    "jsqr": "^1.4.0",
     "marked": "^18.0.10",
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "qrcode": "^1.5.4",
+    "qrcode-generator": "^2.0.4"
   }
 }
