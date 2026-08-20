@@ -944,14 +944,104 @@ async function isSetup(){var s=await dbGet("settings","passphrase_salt");return!
 async function showSetup(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
     '<h2>Set up NoteVault</h2>'+
-    '<p>Create a passphrase to encrypt your notes. Choose something memorable but strong.</p>'+
-    '<input type=password id=setupPassphrase placeholder="Enter passphrase" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')document.getElementById(\'setupPassphraseConfirm\').focus()">'+
+    '<p>Create a passphrase to encrypt your notes, or restore an existing vault from another device.</p>'+
+    '<input type=password id=setupPassphrase placeholder="Enter passphrase (min 8 chars)" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')document.getElementById(\'setupPassphraseConfirm\').focus()">'+
     '<input type=password id=setupPassphraseConfirm placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')startSetup()">'+
     '<div id=setupError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
-    '<div class=modal-actions>'+
-    '<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'+
-    '<button class=btn id=setupNextBtn onclick="startSetup()">Next</button>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;">'+
+    '<button class="btn btn-ghost" onclick="showRestoreExistingVault()" style="color:var(--accent);font-size:12px;padding:6px 10px;">🔄 Restore with 12 words</button>'+
+    '<div style="display:flex;gap:6px;"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'+
+    '<button class=btn id=setupNextBtn onclick="startSetup()">Next</button></div>'+
     '</div></div></div>';}
+
+async function showRestoreExistingVault(){var modal=document.getElementById("modalContainer");
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
+    '<h2>Restore Existing Vault</h2>'+
+    '<p>Enter the 12 recovery words from your other device, and set a passphrase for this device.</p>'+
+    '<textarea id=restoreWords rows=3 placeholder="Enter all 12 words separated by spaces" style="font-family:monospace;"></textarea>'+
+    '<input type=password id=restorePassphrase placeholder="Passphrase for this device (min 8 chars)" autocomplete="new-password" style="margin-top:8px;" onkeydown="if(event.key===\'Enter\')document.getElementById(\'restorePassphraseConfirm\').focus()">'+
+    '<input type=password id=restorePassphraseConfirm placeholder="Confirm passphrase" onkeydown="if(event.key===\'Enter\')doRestoreExistingVault()">'+
+    '<div id=restoreError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
+    '<div class=modal-actions>'+
+    '<button class="btn btn-ghost" onclick="showSetup()">Back</button>'+
+    '<button class=btn id=restoreSubmitBtn onclick="doRestoreExistingVault()">Restore Vault</button>'+
+    '</div></div></div>';}
+
+async function doRestoreExistingVault(){
+  var wordsInput=document.getElementById("restoreWords").value.trim().split(/\s+/);
+  var pw=document.getElementById("restorePassphrase").value;
+  var confirm=document.getElementById("restorePassphraseConfirm").value;
+  var err=document.getElementById("restoreError");
+
+  if(wordsInput.length!==12){
+    err.textContent="Please enter exactly 12 recovery words";
+    err.style.display="";
+    return;
+  }
+  for(var i=0;i<wordsInput.length;i++){
+    var w=wordsInput[i].toLowerCase();
+    if(BIP39_WORDLIST.indexOf(w)===-1){
+      err.textContent="Word '"+w+"' (#"+(i+1)+") is not in BIP39 dictionary";
+      err.style.display="";
+      return;
+    }
+    wordsInput[i]=w;
+  }
+
+  if(pw.length<8){
+    err.textContent="Passphrase must be at least 8 characters";
+    err.style.display="";
+    return;
+  }
+  if(pw!==confirm){
+    err.textContent="Passphrases do not match";
+    err.style.display="";
+    return;
+  }
+
+  try{
+    var rKey=await deriveRecoveryKey(wordsInput);
+    var salt=crypto.randomUUID();
+    await dbPut("settings",{key:"passphrase_salt",value:salt});
+    var recoverySalt="notevault-recovery";
+    await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
+    passphraseKey=await deriveKey(pw,salt);
+    recoveryKey=rKey;
+    var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
+    await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
+    var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw+":"+salt));
+    await dbPut("settings",{key:"passphrase_hash",value:Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("")});
+    var verify=await encryptAESString(recoveryKey,"notevault-verify");
+    await dbPut("settings",{key:"recovery_verify",value:verify});
+    await dbPut("settings",{key:"setup_complete",value:true});
+
+    closeModal();
+    isLocked=false;
+    await loadAllNotesDecrypted();
+    await refreshFolderTree();
+    updatePreview();
+    showToast("Vault restored successfully!");
+
+    setTimeout(function(){
+      showPromptModal({
+        title:"Link GitHub Cloud Sync",
+        message:"To pull and sync your notes from GitHub, enter your GitHub Personal Access Token (or skip to add later in Settings):",
+        placeholder:"ghp_...",
+        confirmText:"Save & Sync",
+        cancelText:"Skip for now",
+        onConfirm:async function(tok){
+          if((tok||"").trim()){
+            await saveGithubToken((tok||"").trim());
+            manualSync();
+          }
+        }
+      });
+    }, 400);
+  }catch(e){
+    err.textContent="Error restoring vault: "+e.message;
+    err.style.display="";
+  }
+}
 
 async function startSetup(){var pw=document.getElementById("setupPassphrase").value;
   var confirm=document.getElementById("setupPassphraseConfirm").value;var err=document.getElementById("setupError");
