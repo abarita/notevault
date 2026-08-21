@@ -1009,11 +1009,16 @@ async function doRestoreExistingVault(){
   }
 
   try{
-    var rKey=await deriveRecoveryKey(wordsInput);
-    var salt=crypto.randomUUID();
-    await dbPut("settings",{key:"passphrase_salt",value:salt});
+    if(db){
+      await dbClear("notes").catch(function(){});
+      await dbClear("folders").catch(function(){});
+    }
+    decryptedNotesCache.clear();
     var recoverySalt="notevault-recovery";
     await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
+    var rKey=await deriveKey(wordsInput.join(" "),recoverySalt,100000,true);
+    var salt=crypto.randomUUID();
+    await dbPut("settings",{key:"passphrase_salt",value:salt});
     passphraseKey=await deriveKey(pw,salt);
     recoveryKey=rKey;
     var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
@@ -1554,9 +1559,13 @@ async function showPairDeviceModal(){
     return;
   }
 
+  var s=await dbGet("settings","recovery_salt");
+  var recoverySalt=(s&&s.value)?s.value:"notevault-recovery";
+
   var payload={
     nv:1,
-    w:words,
+    w:words.map(function(w){return String(w).toLowerCase().trim();}),
+    s:recoverySalt,
     t:githubToken||"",
     g:gistId||""
   };
@@ -1591,20 +1600,23 @@ async function showPairDeviceModal(){
 function showQrScannerModal(){
   var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class="modal-overlay">'+
-    '<div class="modal" style="max-width:460px;text-align:center;">'+
+    '<div class="modal" style="max-width:480px;text-align:center;">'+
     '<h2>📷 Scan Pairing QR Code</h2>'+
     '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+
-    'Point your camera at the NoteVault QR code on your PC screen.'+
+    'Point your camera at the NoteVault QR code on your PC screen, or snap a photo.'+
     '</p>'+
     '<div style="position:relative;width:100%;max-width:320px;height:240px;margin:0 auto 12px;background:#000;border-radius:10px;overflow:hidden;border:2px solid var(--accent);">'+
     '<video id="qrVideo" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;"></video>'+
     '<div style="position:absolute;inset:20px;border:2px dashed var(--accent);border-radius:8px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,0.45);"></div>'+
     '<div id="qrScanLine" style="position:absolute;left:20px;right:20px;top:20px;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:qrScan 2s infinite ease-in-out;"></div>'+
     '</div>'+
-    '<div id="qrScanStatus" style="font-size:12px;color:var(--text2);margin-bottom:12px;">Initializing camera...</div>'+
-    '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;">'+
+    '<div id="qrScanStatus" style="font-size:12px;color:var(--text2);margin-bottom:14px;">Initializing camera...</div>'+
+    '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;">'+
+    '<label class="btn btn-sm" style="cursor:pointer;background:var(--surface3);">'+
+    '📸 Snap QR Photo <input type="file" accept="image/*" capture="environment" id="qrCaptureInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
+    '</label>'+
     '<label class="btn btn-sm btn-ghost" style="cursor:pointer;">'+
-    '📁 Upload QR Image <input type="file" accept="image/*" id="qrFileInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
+    '📁 Choose Image <input type="file" accept="image/*" id="qrFileInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
     '</label>'+
     '</div>'+
     '<div class="modal-actions" style="justify-content:center;">'+
@@ -1619,6 +1631,11 @@ async function startQrScanner(){
   var status=document.getElementById("qrScanStatus");
   if(!video)return;
 
+  if(location.protocol==="file:"){
+    if(status)status.textContent="💡 Local file mode (camera requires HTTPS). Tap '📸 Snap QR Photo' or '📁 Choose Image' above to scan.";
+    return;
+  }
+
   try{
     qrScannerStream=await navigator.mediaDevices.getUserMedia({
       video:{facingMode:{ideal:"environment"}}
@@ -1628,7 +1645,7 @@ async function startQrScanner(){
     if(status)status.textContent="Scanning for QR code...";
     scanQrFrameLoop();
   }catch(err){
-    if(status)status.textContent="Camera unavailable: "+err.message+". You can upload a QR image.";
+    if(status)status.textContent="Live camera unavailable ("+err.name+"). Tap '📸 Snap QR Photo' or '📁 Choose Image' above.";
   }
 }
 
@@ -1785,19 +1802,23 @@ async function finishQrPairing(){
   }
 
   try{
-    var words=qrScannedPayload.w;
-    var rKey=await deriveRecoveryKey(words);
-    var salt=crypto.randomUUID();
+    var words=(qrScannedPayload.w||[]).map(function(w){return String(w).toLowerCase().trim();});
+    var recoverySalt=qrScannedPayload.s||"notevault-recovery";
+
     if(db){
       await dbClear("notes").catch(function(){});
       await dbClear("folders").catch(function(){});
     }
     decryptedNotesCache.clear();
-    await dbPut("settings",{key:"passphrase_salt",value:salt});
-    var recoverySalt="notevault-recovery";
+
     await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
-    passphraseKey=await deriveKey(pw,salt);
+    var rKey=await deriveKey(words.join(" "),recoverySalt,100000,true);
     recoveryKey=rKey;
+
+    var salt=crypto.randomUUID();
+    await dbPut("settings",{key:"passphrase_salt",value:salt});
+    passphraseKey=await deriveKey(pw,salt);
+
     var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
     await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
     var encWords=await encryptAESString(passphraseKey,JSON.stringify(words));
@@ -1808,14 +1829,14 @@ async function finishQrPairing(){
     await dbPut("settings",{key:"recovery_verify",value:verify});
 
     if(qrScannedPayload.t){
-      githubToken=qrScannedPayload.t;
+      githubToken=String(qrScannedPayload.t).trim();
       var encTok=await encryptAESString(recoveryKey,githubToken);
       await dbPut("settings",{key:"github_token_encrypted",value:encTok});
       syncEnabled=true;
       await dbPut("settings",{key:"auto_sync",value:true});
     }
     if(qrScannedPayload.g){
-      gistId=qrScannedPayload.g;
+      gistId=String(qrScannedPayload.g).trim();
       await dbPut("settings",{key:"gist_id",value:gistId});
     }
 

@@ -302,6 +302,7 @@ async function runUnitTests() {
   const testQrPayload = {
     nv: 1,
     w: testPairWords,
+    s: "notevault-recovery",
     t: "ghp_testToken1234567890abcdef",
     g: "gist1234567890abcdef"
   };
@@ -318,6 +319,7 @@ async function runUnitTests() {
   const parsedPayload = JSON.parse(qrStr);
   assertEq(parsedPayload.nv, 1, "Pairing payload version is 1");
   assertEq(parsedPayload.w.length, 12, "Pairing payload contains exactly 12 recovery words");
+  assertEq(parsedPayload.s, "notevault-recovery", "Pairing payload contains recovery salt");
   assertEq(parsedPayload.t, "ghp_testToken1234567890abcdef", "Pairing payload contains GitHub token");
   assertEq(parsedPayload.g, "gist1234567890abcdef", "Pairing payload contains Gist ID");
 
