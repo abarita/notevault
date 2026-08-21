@@ -12772,6 +12772,7 @@ function dbPut(store,val){return new Promise(function(r,j){var tx=db.transaction
 function dbGet(store,key){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).get(key);req.onsuccess=function(){r(req.result);};req.onerror=function(){r(null);};});}
 function dbGetAll(store){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).getAll();req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
 function dbDelete(store,key){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).delete(key);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
+function dbClear(store){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).clear();req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
 function dbGetByIndex(store,idx,val){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).index(idx).getAll(val);req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
 
 // === ENCRYPTED STORAGE AT REST HELPERS ===
@@ -13594,14 +13595,20 @@ async function doVerifyRecovery(){var input=document.getElementById("verifyWords
   }catch(e){err.textContent="Words do not match: "+e.message;err.style.display="";}}
 
 async function showUnlock(){var modal=document.getElementById("modalContainer");
-  modal.innerHTML='<div class=modal-overlay><div class=modal>'+
+  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
     '<h2>Unlock NoteVault</h2>'+
-    '<p>Enter your passphrase to unlock your notes.</p>'+
+    '<p>Enter your passphrase, or scan your PC\'s QR code to pair this device.</p>'+
     '<input type=password id=unlockPassphrase placeholder="Enter passphrase" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doUnlock()">'+
     '<div id=unlockError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
-    '<div class=modal-actions>'+
-    '<button class="btn btn-ghost" onclick="showRecovery()">Forgot passphrase?</button>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+    '<button class="btn btn-ghost" onclick="showQrScannerModal()" style="color:var(--accent);font-size:12px;padding:6px 10px;">📷 Scan QR to Pair</button>'+
+    '<button class="btn btn-ghost" onclick="showRecovery()" style="font-size:12px;padding:6px 10px;">Forgot passphrase?</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;align-items:center;">'+
+    '<button class="btn btn-ghost btn-danger" onclick="resetVaultAndStartSetup()" style="font-size:11px;padding:6px 8px;" title="Reset local database on this device">Reset</button>'+
     '<button class=btn onclick="doUnlock()">Unlock</button>'+
+    '</div>'+
     '</div></div></div>';
   setTimeout(function(){var el=document.getElementById("unlockPassphrase");if(el)el.focus();},100);}
 
@@ -13624,13 +13631,39 @@ async function doUnlock(){var pw=document.getElementById("unlockPassphrase").val
 async function showRecovery(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
     '<h2>Recover Your Notes</h2>'+
-    '<p>Enter your 12 recovery words to regain access.</p>'+
+    '<p>Enter your 12 recovery words, or scan the pairing QR code from your PC.</p>'+
     '<textarea id=recoveryInput rows=4 placeholder="Enter all 12 words separated by spaces" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();doRecovery()}"></textarea>'+
     '<div id=recoveryError style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none;"></div>'+
-    '<div class=modal-actions>'+
+    '<div class=modal-actions style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'+
+    '<button class="btn btn-ghost" onclick="showQrScannerModal()" style="color:var(--accent);font-size:12px;">📷 Scan QR Code</button>'+
+    '<div style="display:flex;gap:6px;">'+
     '<button class="btn btn-ghost" onclick="showUnlock()">Back</button>'+
     '<button class=btn onclick="doRecovery()">Recover</button>'+
-    '</div></div></div>';}
+    '</div></div></div></div>';}
+
+async function resetVaultAndStartSetup(){
+  showConfirmModal({
+    title:"Reset This Device?",
+    message:"This will clear all local vault data on this browser so you can pair with your PC or start fresh. Notes synced to your GitHub Gist will remain safe.",
+    confirmText:"Reset & Pair",
+    danger:true,
+    onConfirm:async function(){
+      try{
+        if(db){
+          await dbClear("notes").catch(function(){});
+          await dbClear("folders").catch(function(){});
+          await dbClear("settings").catch(function(){});
+        }
+      }catch(_){}
+      decryptedNotesCache.clear();
+      clearEditor();
+      document.getElementById("folderTree").innerHTML="";
+      recoveryKey=null;passphraseKey=null;githubToken=null;gistId=null;syncEnabled=false;isLocked=true;
+      showSetup();
+      showToast("Ready to pair with your PC");
+    }
+  });
+}
 
 async function doRecovery(){var input=document.getElementById("recoveryInput").value.trim().split(/\s+/);var err=document.getElementById("recoveryError");
   if(input.length!==12){err.textContent="Please enter exactly 12 words";err.style.display="";return;}
@@ -14240,6 +14273,11 @@ async function finishQrPairing(){
     var words=qrScannedPayload.w;
     var rKey=await deriveRecoveryKey(words);
     var salt=crypto.randomUUID();
+    if(db){
+      await dbClear("notes").catch(function(){});
+      await dbClear("folders").catch(function(){});
+    }
+    decryptedNotesCache.clear();
     await dbPut("settings",{key:"passphrase_salt",value:salt});
     var recoverySalt="notevault-recovery";
     await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
