@@ -2028,14 +2028,23 @@ function showHelpModal(activeTab){
       '</div>';
   } else if(activeTab === "security"){
     tabContent = '<div style="font-size:13px;line-height:1.6;color:var(--text2);display:flex;flex-direction:column;gap:14px;">'+
-      '<div><strong style="color:var(--accent);">Zero-Knowledge Cryptography</strong>'+
-      '<ul style="padding-left:18px;margin-top:4px;">'+
-      '<li><strong>AES-256-GCM</strong>: Authenticated symmetric encryption for all notes at rest in IndexedDB and in GitHub Gists.</li>'+
-      '<li><strong>PBKDF2-HMAC-SHA256</strong>: 100,000 key derivation iterations with unique cryptographic salts.</li>'+
-      '<li><strong>BIP39 Standard</strong>: 12-word human-readable master recovery seed (2048 words standard dictionary).</li>'+
-      '<li><strong>Local-First &amp; Offline</strong>: Standalone bundle runs 100% locally with zero external telemetry or tracking.</li>'+
+      '<div style="background:var(--surface2);padding:10px 12px;border-radius:8px;"><strong style="color:var(--accent);">🔑 Envelope Encryption (2-Tier Key Architecture)</strong>'+
+      '<ul style="padding-left:18px;margin-top:6px;">'+
+      '<li><strong>1. Master Recovery Key (12 Words)</strong>: Derived via PBKDF2 (100,000 rounds). It encrypts all note titles, contents, and the remote GitHub Gist (<code>vault.enc</code>). Identical across all paired devices.</li>'+
+      '<li><strong>2. Local Passphrase Key</strong>: Derived from your daily typing password (600,000 rounds). It <em>wraps (encrypts)</em> the Master Recovery Key and saves it locally in IndexedDB. Can be different on PC vs Phone!</li>'+
       '</ul></div>'+
-      '</div>';
+      '<div><strong style="color:var(--accent);">🛡️ What is Saved in IndexedDB vs. Never Saved</strong>'+
+      '<ul style="padding-left:18px;margin-top:4px;">'+
+      '<li>❌ <strong>Passphrase</strong>: NEVER saved anywhere on disk. Exists only in your memory.</li>'+
+      '<li>❌ <strong>Plaintext Notes &amp; Keys</strong>: NEVER saved unencrypted. Temporarily in RAM while unlocked; wiped on lock/tab close.</li>'+
+      '<li>✅ <strong>Encrypted at Rest</strong>: Notes and Wrapped Master Key are scrambled with <strong>AES-256-GCM</strong>. Anyone inspecting IndexedDB only sees unreadable ciphertext.</li>'+
+      '</ul></div>'+
+      '<div><strong style="color:var(--accent);">⚡ Instant Passphrase Change</strong>'+
+      '<p style="margin-top:4px;">Changing your passphrase only re-encrypts the tiny wrapped master key (takes 5ms) without needing to re-encrypt hundreds of notes or re-upload the cloud vault.</p>'+
+      '</div>'+
+      '<div><strong style="color:var(--accent);">📱 Why 12 Words Bootstrap Everything</strong>'+
+      '<p style="margin-top:4px;">Because all notes and Gist sync envelopes are encrypted with the Master Recovery Key, scanning or entering the 12 words on any device regenerates the identical master key and instantly decrypts your vault.</p>'+
+      '</div></div>';
   }
 
   modal.innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()">'+

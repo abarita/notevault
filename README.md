@@ -93,35 +93,74 @@ To sync your notes between your PC and Mobile Phone:
 
 ---
 
-## 🔒 Security & Cryptography
+## 🔒 Security, Storage & Cryptography Architecture
+
+NoteVault uses an **Envelope Encryption (2-Tier Key Architecture)** that separates your daily device passphrase from your underlying vault data.
 
 ```
-                ┌─────────────────────────────────────────┐
-                │          User Passphrase                │
-                └─────────────────────────────────────────┘
-                                     │
-                        PBKDF2-HMAC-SHA256 (100,000)
-                                     ▼
-                ┌─────────────────────────────────────────┐
-                │             Passphrase Key              │
-                └─────────────────────────────────────────┘
-                                     │ (Unwraps)
-                                     ▼
-┌───────────────────────┐      ┌──────────────────────────┐
-│   12 Recovery Words   │ ───> │  Master Recovery Key     │ (AES-256-GCM)
-└───────────────────────┘      └──────────────────────────┘
-                                     │
-                    ┌────────────────┴────────────────┐
-                    ▼                                 ▼
-      ┌───────────────────────────┐     ┌───────────────────────────┐
-      │  Local IndexedDB Storage  │     │   Remote GitHub Gist      │
-      │  (Encrypted at Rest)      │     │   (vault.enc)             │
-      └───────────────────────────┘     └───────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    12 RECOVERY WORDS                        │
+│                 (Root of Trust / Master Seed)               │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ PBKDF2 (100,000 rounds)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  MASTER RECOVERY KEY (AES-256)              │
+│       * Encrypts ALL note contents & titles                 │
+│       * Encrypts the GitHub Gist (vault.enc)                │
+│       * Identical on PC, Phone, and all paired devices      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+            Wrapped & Encrypted locally with:
+                               │
+┌──────────────────────────────┴──────────────────────────────┐
+│                    LOCAL PASSPHRASE KEY                     │
+│                 (Device-Specific Door Lock)                 │
+│       * Derived from your daily typing password             │
+│       * Stored safely encrypted inside device's IndexedDB   │
+│       * Can be DIFFERENT on your PC vs Phone!               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-* **AES-256-GCM**: Every note payload and exported backup is encrypted using authenticated AES-GCM with a fresh 12-byte initialization vector (IV) per write.
-* **Salt & Key Derivation**: Passphrases derive keys using 100,000 iterations of PBKDF2 with unique cryptographic salts stored in IndexedDB.
-* **Zero Plaintext Transmission**: Notes are encrypted in client memory before touching IndexedDB or GitHub Gist APIs.
+### 1. The 2-Tier Key System Explained
+
+1. **Master Recovery Key (Derived from 12 BIP39 Words)**:
+   * This is the fundamental key that encrypts all note titles, note bodies, and the remote GitHub Gist (`vault.enc`).
+   * It is generated from the 12 recovery words using PBKDF2-HMAC-SHA256 (100,000 rounds).
+   * Because it is deterministic from the 12 words, **the 12 words can bootstrap and decrypt your vault on any new device**.
+
+2. **Local Passphrase Key (Your Daily Password)**:
+   * This key acts as the "safe door lock" on each specific device.
+   * Derived from your daily typed passphrase using PBKDF2-HMAC-SHA256 (600,000 rounds) + a unique random salt.
+   * It **wraps (encrypts)** the Master Recovery Key and stores the ciphertext in your device's `IndexedDB`.
+   * **Advantage**: You can have a long 20-character passphrase on your PC keyboard, and a convenient shorter passphrase on your phone touchscreen!
+   * **Instant Passphrase Change**: Changing your passphrase only re-encrypts the tiny wrapped master key (takes 5ms) without needing to re-encrypt hundreds of note files or re-upload your GitHub Gist.
+
+---
+
+### 2. What is Saved in IndexedDB vs. What is NEVER Saved
+
+| Data | Stored in IndexedDB? | Security State |
+| :--- | :--- | :--- |
+| **Your Passphrase** | ❌ **NEVER** | Exists ONLY in your human memory. Never touches disk. |
+| **Plaintext Master Key** | ❌ **NEVER** | Temporarily in RAM while unlocked; wiped on lock/tab close. |
+| **Plaintext Notes** | ❌ **NEVER** | Encrypted with AES-256-GCM before writing to IndexedDB. |
+| **`recovery_key_encrypted`** | ✅ Yes | Scrambled ciphertext wrapped with your local Passphrase Key. |
+| **`passphrase_hash`** | ✅ Yes | One-way SHA-256 hash `SHA-256(passphrase + ":" + salt)` used only for login verification. |
+| **`passphrase_salt`** | ✅ Yes | Random UUID cryptographic salt for key derivation. |
+
+> **The Titanium Safe Analogy**:
+> Anyone who accesses your computer or opens Developer Tools (`F12 ➔ Application ➔ IndexedDB`) only sees a locked titanium safe (`recovery_key_encrypted`). Without the combination inside your brain (your passphrase), it is mathematically impossible to reach inside and obtain the master key.
+
+---
+
+### 3. Cryptographic Specifications
+
+* **Authenticated Encryption**: **AES-256-GCM** (Galois/Counter Mode) with unique 12-byte initialization vectors (IVs) generated via `crypto.getRandomValues()` for every single write.
+* **Key Derivation Functions (KDF)**: **PBKDF2-HMAC-SHA256** (600,000 iterations for passphrase; 100,000 iterations for recovery seed).
+* **Mnemonic Standard**: **BIP39** with the standard 2048-word dictionary, providing 128 bits of cryptographic entropy.
+* **Integrity & Tamper Protection**: GCM authentication tags prevent any tampering or bit-flipping attacks.
+* **Zero-Knowledge Architecture**: Encryption and decryption happen exclusively in client-side JavaScript memory (Web Cryptography API). Plaintext never leaves your browser.
 
 ---
 
