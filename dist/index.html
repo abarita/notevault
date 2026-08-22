@@ -13871,6 +13871,7 @@ async function syncToGist(){
     await dbPut("settings",{key:"last_synced_at",value:Date.now()});
     updateSyncIndicator();
     showToast("Synced!");
+    try{await syncCadenceGist();}catch(_){}
   }catch(e){
     console.error("[NoteVault Sync Network/General Error]",e);
     showToast("Sync error: "+e.message,true);
@@ -14412,6 +14413,8 @@ async function triggerPwaInstall(){
 // === SETTINGS ===
 async function openSettings(){var modal=document.getElementById("modalContainer");
   var tokSet=!!githubToken;var gidSet=!!gistId;
+  var cGistSetting=await dbGet("settings","cadence_gist_id");
+  var cGistId=cGistSetting?cGistSetting.value:null;
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
     '<h2>Settings</h2>'+
     (deferredInstallPrompt?'<div class=settings-row style="background:var(--surface2);padding:10px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Install App</label><button class="btn btn-sm" onclick="triggerPwaInstall()">📲 Install NoteVault</button></div>':'')+
@@ -14422,6 +14425,9 @@ async function openSettings(){var modal=document.getElementById("modalContainer"
     '<div class=settings-row><label>Gist ID</label><div style="display:flex;align-items:center;gap:6px;">'+
     (gidSet?'<a href="https://gist.github.com/'+gistId+'" target="_blank" rel="noopener" style="font-size:12px;color:var(--accent);text-decoration:underline;">'+gistId.substring(0,8)+'... ↗</a>':'<span style="font-size:12px;color:var(--text2);">Not synced</span>')+
     '<button class="btn btn-sm btn-ghost" onclick="setGistIdModal()">'+(gidSet?"Edit":"Link")+'</button></div></div>'+
+    '<div class=settings-row><label>✦ Cadence English Sync</label><div style="display:flex;align-items:center;gap:6px;">'+
+    (cGistId?'<span style="font-size:12px;color:var(--accent);">Auto-Linked</span>':'<span style="font-size:12px;color:var(--text2);">Auto-Discover</span>')+
+    '<button class="btn btn-sm btn-ghost" onclick="setCadenceGistModal()">'+(cGistId?"Edit":"Link")+'</button></div></div>'+
     '<div class=settings-row><label>Sync Status</label><span style="font-size:12px;color:var(--text2);">'+(syncEnabled?"Enabled":"Disabled")+'</span></div>'+
     '<div class=settings-row><label>Auto-sync</label>'+
     '<button class="btn btn-sm btn-ghost" onclick="toggleAutoSync()">'+(syncEnabled?"On":"Off")+'</button></div>'+
@@ -14556,6 +14562,75 @@ function setGistIdModal(){
       updateSyncIndicator();
       showToast(gistId?"Gist ID linked":"Gist ID cleared");
     }
+  });
+}
+
+// === CADENCE EXECUTIVE VOCABULARY AUTO-SYNC ===
+async function syncCadenceGist(){
+  if(!githubToken||isLocked)return;
+  try{
+    var cadenceGistSetting=await dbGet("settings","cadence_gist_id");
+    var cid=cadenceGistSetting?cadenceGistSetting.value:null;
+
+    if(!cid){
+      var listResp=await fetch("https://api.github.com/gists",{
+        headers:{Authorization:"token "+githubToken,Accept:"application/vnd.github.v3+json"}
+      });
+      if(listResp.ok){
+        var list=await listResp.json();
+        var found=list.find(function(g){
+          return g.description==="Cadence Executive English — Spaced Revision Sync"||
+                 (g.files&&(g.files["cadence-notevault.json"]||g.files["cadence-sync.json"]));
+        });
+        if(found){
+          cid=found.id;
+          await dbPut("settings",{key:"cadence_gist_id",value:cid});
+        }
+      }
+    }
+
+    if(cid){
+      var cResp=await fetch("https://api.github.com/gists/"+cid,{
+        headers:{Authorization:"token "+githubToken,Accept:"application/vnd.github.v3+json"}
+      });
+      if(cResp.ok){
+        var cJson=await cResp.json();
+        var fileObj=cJson.files&&(cJson.files["cadence-notevault.json"]||cJson.files["notevault-export.json"]);
+        if(fileObj&&fileObj.content){
+          var rawContent=fileObj.content;
+          if(fileObj.truncated&&fileObj.raw_url){
+            var rawResp=await fetch(fileObj.raw_url);
+            if(rawResp.ok)rawContent=await rawResp.text();
+          }
+          var cadenceVault=JSON.parse(rawContent);
+          expandedFolders.add("folder_cadence_root");
+          await mergeVault(cadenceVault);
+          console.log("[NoteVault] Auto-synced Cadence vocabulary notes successfully!");
+        }
+      }
+    }
+  }catch(err){
+    console.warn("[NoteVault Cadence Sync Warning]",err);
+  }
+}
+
+function setCadenceGistModal(){
+  dbGet("settings","cadence_gist_id").then(function(s){
+    var cur=s?s.value:"";
+    showPromptModal({
+      title:"Cadence Vocabulary Auto-Sync",
+      message:"Link your Cadence Gist ID for automatic background synchronization of personal vocabulary notes and starred flashcards.",
+      defaultValue:cur,
+      placeholder:"Gist ID (leave blank to auto-discover)",
+      confirmText:"Save & Sync",
+      onConfirm:async function(gid){
+        var val=gid?gid.trim():null;
+        await dbPut("settings",{key:"cadence_gist_id",value:val});
+        showToast(val?"Cadence Gist linked":"Cadence Gist auto-discovery active");
+        openSettings();
+        await syncCadenceGist();
+      }
+    });
   });
 }
 
