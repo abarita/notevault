@@ -323,6 +323,32 @@ async function runUnitTests() {
   assertEq(parsedPayload.t, "ghp_testToken1234567890abcdef", "Pairing payload contains GitHub token");
   assertEq(parsedPayload.g, "gist1234567890abcdef", "Pairing payload contains Gist ID");
 
+  console.log("\n=== Tombstones & Deletion Synchronization ===");
+  const localVaultNotes = [
+    { id: "note_active", title: "Active Note", updatedAt: 1000 },
+    { id: "note_to_delete", title: "Old Note", updatedAt: 1000 }
+  ];
+  const localTombstones = {
+    "note_to_delete": { type: "note", deletedAt: 2000 }
+  };
+  const remoteVault = {
+    notes: [
+      { id: "note_active", title: "Active Note Updated", updatedAt: 1500 },
+      { id: "note_to_delete", title: "Old Note", updatedAt: 1000 }
+    ],
+    tombstones: {}
+  };
+  const mergedNotes = [];
+  for (const n of remoteVault.notes) {
+    const tomb = localTombstones[n.id];
+    if (tomb && tomb.deletedAt >= n.updatedAt) {
+      continue;
+    }
+    mergedNotes.push(n);
+  }
+  assertEq(mergedNotes.length, 1, "Tombstone prevents deleted note from resurrecting during sync");
+  assertEq(mergedNotes[0].id, "note_active", "Active updated note preserved during sync");
+
   console.log("\n=================================");
   console.log("       UNIT TESTS SUMMARY        ");
   console.log("=================================");

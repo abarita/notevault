@@ -290,9 +290,38 @@ function dbDelete(store,key){return new Promise(function(r,j){var tx=db.transact
 function dbClear(store){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).clear();req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
 function dbGetByIndex(store,idx,val){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).index(idx).getAll(val);req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
 
+// === TOMBSTONES / DELETION TRACKING ===
+async function recordTombstone(id, type){
+  try{
+    if(!id||!db)return;
+    var setting=await dbGet("settings","tombstones");
+    var tombstones=(setting&&setting.value)?setting.value:{};
+    tombstones[id]={type:type||"note",deletedAt:Date.now()};
+    await dbPut("settings",{key:"tombstones",value:tombstones});
+  }catch(_){}
+}
+async function removeTombstone(id){
+  try{
+    if(!id||!db)return;
+    var setting=await dbGet("settings","tombstones");
+    if(setting&&setting.value&&setting.value[id]){
+      delete setting.value[id];
+      await dbPut("settings",{key:"tombstones",value:setting.value});
+    }
+  }catch(_){}
+}
+async function getTombstones(){
+  try{
+    if(!db)return {};
+    var setting=await dbGet("settings","tombstones");
+    return (setting&&setting.value)?setting.value:{};
+  }catch(_){return {};}
+}
+
 // === ENCRYPTED STORAGE AT REST HELPERS ===
 async function saveNoteRecord(note){
   decryptedNotesCache.set(note.id,Object.assign({},note));
+  await removeTombstone(note.id);
   if(!recoveryKey){await dbPut("notes",note);return;}
   var payload=JSON.stringify({title:note.title||"Untitled",content:note.content||"",format:note.format||"auto",customTitle:note.customTitle||false});
   var enc=await encryptAES(recoveryKey,payload);
@@ -654,10 +683,12 @@ async function deleteFolder(id){
       var deletedIds=new Set();
       async function deleteRecursive(fid){
         deletedIds.add(fid);
+        await recordTombstone(fid, "folder");
         var subChildren=await dbGetByIndex("folders","parentId",fid);
         var subNotes=await dbGetByIndex("notes","folderId",fid);
         for(var i=0;i<subChildren.length;i++)await deleteRecursive(subChildren[i].id);
         for(var j=0;j<subNotes.length;j++){
+          await recordTombstone(subNotes[j].id, "note");
           await dbDelete("notes",subNotes[j].id);
           decryptedNotesCache.delete(subNotes[j].id);
         }
@@ -668,6 +699,9 @@ async function deleteFolder(id){
       if(currentNoteId&&!decryptedNotesCache.has(currentNoteId)){currentNoteId=null;clearEditor();}
       await refreshFolderTree();
       showToast("Deleted");
+      if(syncEnabled&&githubToken&&gistId&&!syncInProgress){
+        manualSync();
+      }
     }
   });
 }
@@ -856,13 +890,18 @@ async function deleteCurrentNote(){
     confirmText:"Delete",
     danger:true,
     onConfirm:async function(){
-      await dbDelete("notes",currentNoteId);
-      decryptedNotesCache.delete(currentNoteId);
+      var deletedId=currentNoteId;
+      await recordTombstone(deletedId, "note");
+      await dbDelete("notes",deletedId);
+      decryptedNotesCache.delete(deletedId);
       try{localStorage.removeItem("notevault_last_note_id");}catch(_){}
       currentNoteId=null;
       clearEditor();
       await refreshFolderTree();
       showToast("Deleted");
+      if(syncEnabled&&githubToken&&gistId&&!syncInProgress){
+        manualSync();
+      }
     }
   });
 }
@@ -1531,17 +1570,70 @@ async function forceOverwriteRemoteGist(){
 async function getVaultJSON(){
   var folders=await dbGetAll("folders");
   var notes=getAllDecryptedNotes();
-  return{version:2,folders:folders,notes:notes};
+  var tombstones=await getTombstones();
+  return{version:2,folders:folders,notes:notes,tombstones:tombstones};
 }
 
-async function mergeVault(vault){if(!vault||!vault.folders||!vault.notes)return;
+async function mergeVault(vault){
+  if(!vault)return;
   var localFolders=await dbGetAll("folders");
   var localFolderMap={};localFolders.forEach(function(f){localFolderMap[f.id]=f;});
-  for(var i=0;i<vault.folders.length;i++){var f=vault.folders[i];var local=localFolderMap[f.id];
-    if(!local||f.updatedAt>local.updatedAt)await dbPut("folders",f);}
-  for(var j=0;j<vault.notes.length;j++){var n=vault.notes[j];var local2=getDecryptedNote(n.id);
-    if(!local2||n.updatedAt>local2.updatedAt){await saveNoteRecord(n);}}
-  await refreshFolderTree();}
+
+  // Synchronize tombstones (deletions)
+  var localTombstones=await getTombstones();
+  var remoteTombstones=vault.tombstones||{};
+  var mergedTombstones=Object.assign({},localTombstones);
+  for(var tid in remoteTombstones){
+    if(!mergedTombstones[tid]||remoteTombstones[tid].deletedAt>mergedTombstones[tid].deletedAt){
+      mergedTombstones[tid]=remoteTombstones[tid];
+    }
+  }
+  await dbPut("settings",{key:"tombstones",value:mergedTombstones});
+
+  // Folders: apply deletions or Last-Write-Wins updates
+  if(vault.folders){
+    for(var i=0;i<vault.folders.length;i++){
+      var f=vault.folders[i];
+      var local=localFolderMap[f.id];
+      var tomb=mergedTombstones[f.id];
+      if(tomb&&tomb.deletedAt>=(f.updatedAt||0)){
+        if(local){await dbDelete("folders",f.id);}
+        continue;
+      }
+      if(tomb&&(f.updatedAt||0)>tomb.deletedAt){
+        await removeTombstone(f.id);
+      }
+      if(!local||f.updatedAt>local.updatedAt){
+        await dbPut("folders",f);
+      }
+    }
+  }
+
+  // Notes: apply deletions or Last-Write-Wins updates
+  if(vault.notes){
+    for(var j=0;j<vault.notes.length;j++){
+      var n=vault.notes[j];
+      var local2=getDecryptedNote(n.id);
+      var tomb2=mergedTombstones[n.id];
+      if(tomb2&&tomb2.deletedAt>=(n.updatedAt||0)){
+        if(local2||(await dbGet("notes",n.id))){
+          await dbDelete("notes",n.id);
+          decryptedNotesCache.delete(n.id);
+          if(currentNoteId===n.id){currentNoteId=null;clearEditor();}
+        }
+        continue;
+      }
+      if(tomb2&&(n.updatedAt||0)>tomb2.deletedAt){
+        await removeTombstone(n.id);
+      }
+      if(!local2||n.updatedAt>local2.updatedAt){
+        await saveNoteRecord(n);
+      }
+    }
+  }
+
+  await refreshFolderTree();
+}
 
 function updateSyncIndicator(){var dot=document.querySelector("#syncIndicator .sync-dot");var label=document.getElementById("syncLabel");
   if(!dot||!label)return;
