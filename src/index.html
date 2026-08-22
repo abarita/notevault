@@ -759,6 +759,7 @@ function _testContextMenu(){var results=[];function ok(cond,msg){results.push({p
 // === NOTE OPERATIONS ===
 async function loadNote(id){
   currentNoteId=id;
+  try{if(id)localStorage.setItem("notevault_last_note_id",id);}catch(_){}
   var note=getDecryptedNote(id);
   if(!note){
     var raw=await dbGet("notes",id);
@@ -857,6 +858,7 @@ async function deleteCurrentNote(){
     onConfirm:async function(){
       await dbDelete("notes",currentNoteId);
       decryptedNotesCache.delete(currentNoteId);
+      try{localStorage.removeItem("notevault_last_note_id");}catch(_){}
       currentNoteId=null;
       clearEditor();
       await refreshFolderTree();
@@ -1146,7 +1148,37 @@ async function doUnlock(){var pw=document.getElementById("unlockPassphrase").val
     closeModal();isLocked=false;
     await loadAllNotesDecrypted();
     await refreshFolderTree();updatePreview();updateSyncIndicator();showToast("Unlocked");
+    await restoreLastOpenedNote();
   }catch(e){err.textContent="Error unlocking: "+e.message;err.style.display="";}}
+
+async function restoreLastOpenedNote(){
+  try{
+    var lastNoteId=localStorage.getItem("notevault_last_note_id");
+    if(lastNoteId){
+      var targetNote=getDecryptedNote(lastNoteId);
+      if(!targetNote){
+        var raw=await dbGet("notes",lastNoteId);
+        if(raw&&raw.encryptedData&&recoveryKey){
+          var dec=await decryptAES(recoveryKey,raw.encryptedData);
+          var p=JSON.parse(dec);
+          targetNote={id:raw.id,folderId:raw.folderId||null,title:p.title||"Untitled",content:p.content||"",format:p.format||"auto",customTitle:p.customTitle||false,createdAt:raw.createdAt||Date.now(),updatedAt:raw.updatedAt||Date.now()};
+          decryptedNotesCache.set(raw.id,targetNote);
+        }else if(raw){targetNote=raw;}
+      }
+      if(targetNote){
+        if(targetNote.folderId){
+          expandedFolders.add(targetNote.folderId);
+          var f=await dbGet("folders",targetNote.folderId);
+          while(f&&f.parentId){
+            expandedFolders.add(f.parentId);
+            f=await dbGet("folders",f.parentId);
+          }
+        }
+        await loadNote(lastNoteId);
+      }
+    }
+  }catch(_){}
+}
 
 async function showRecovery(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:560px;">'+
@@ -1216,7 +1248,8 @@ async function setNewPassphrase(){var pw=document.getElementById("newPassphrase"
   if(githubToken){var encTok=await encryptAESString(recoveryKey,githubToken);await dbPut("settings",{key:"github_token_encrypted",value:encTok});}
   closeModal();isLocked=false;
   await loadAllNotesDecrypted();
-  await refreshFolderTree();updatePreview();showToast("Passphrase updated");}
+  await refreshFolderTree();updatePreview();showToast("Passphrase updated");
+  await restoreLastOpenedNote();}
 
 function changePassphrase(){
   var modal=document.getElementById("modalContainer");
@@ -1900,6 +1933,7 @@ async function finishQrPairing(){
     updatePreview();
     updateSyncIndicator();
     showToast("Device paired & synced successfully! 🎉");
+    await restoreLastOpenedNote();
 
     if(githubToken){
       manualSync();
