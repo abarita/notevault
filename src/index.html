@@ -877,10 +877,15 @@ async function moveNoteTo(folderId,noteId){
 var dragNoteId=null;
 function dragStart(e,id){dragNoteId=id;e.target.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",id);}
 function dragEnd(e){dragNoteId=null;document.querySelectorAll(".dragging,.drag-over").forEach(function(el){el.classList.remove("dragging");el.classList.remove("drag-over");});}
-function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect="move";}
-function dragEnter(e){e.preventDefault();var el=e.target.closest(".drop-target")||e.target.closest("#folderTree");if(el)el.classList.add("drag-over");}
-function dragLeave(e){var el=e.target.closest(".drop-target")||e.target.closest("#folderTree");if(el)el.classList.remove("drag-over");}
-function dropNote(e,folderId){e.preventDefault();e.stopPropagation();e.target.closest(".drop-target")?.classList.remove("drag-over");document.getElementById("folderTree")?.classList.remove("drag-over");if(dragNoteId){moveNoteTo(folderId,dragNoteId);dragNoteId=null;}}
+function dropNote(e,folderId){
+  e.preventDefault();
+  e.stopPropagation();
+  var dropEl=e.target.closest(".drop-target");
+  if(dropEl)dropEl.classList.remove("drag-over");
+  var treeEl=document.getElementById("folderTree");
+  if(treeEl)treeEl.classList.remove("drag-over");
+  if(dragNoteId){moveNoteTo(folderId,dragNoteId);dragNoteId=null;}
+}
 
 async function deleteCurrentNote(){
   if(!currentNoteId||!db)return;
@@ -2600,10 +2605,46 @@ function applyMobileView(){
 window.addEventListener("resize",applyMobileView);
 
 // === INIT ===
-async function init(){await openDB();await initTheme();initResizers();initSyncScroll();applyMobileView();var autoSync=await dbGet("settings","auto_sync");if(autoSync)syncEnabled=autoSync.value;
-  if(location.protocol!=="file:"){if("serviceWorker"in navigator){try{await navigator.serviceWorker.register("sw.js");}catch(e){}}}
-  var setup=await isSetup();
-  if(!setup){await showSetup();}else{await showUnlock();}
+async function init(){
+  try{
+    if(!window.crypto||!window.crypto.subtle){
+      var mc=document.getElementById("modalContainer");
+      if(mc){
+        mc.innerHTML='<div class=modal-overlay><div class=modal style="max-width:480px;text-align:center;">'+
+          '<h2 style="color:var(--danger)">🔒 Secure Context Required</h2>'+
+          '<p style="color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:14px;">'+
+          'iOS Safari requires <strong>HTTPS</strong> or <strong>localhost</strong> for AES-256 Web Crypto. '+
+          'If you are opening NoteVault via a local IP, please open it via your GitHub Pages HTTPS URL or Safari browser.'+
+          '</p>'+
+          '<div class=modal-actions style="justify-content:center;">'+
+          '<button class=btn onclick="location.reload()">Reload</button>'+
+          '</div></div></div>';
+      }
+      return;
+    }
+    await openDB();
+    await initTheme();
+    initResizers();
+    initSyncScroll();
+    applyMobileView();
+    var autoSync=await dbGet("settings","auto_sync");if(autoSync)syncEnabled=autoSync.value;
+    if(location.protocol!=="file:"){if("serviceWorker"in navigator){try{await navigator.serviceWorker.register("sw.js");}catch(e){}}}
+    var setup=await isSetup();
+    if(!setup){await showSetup();}else{await showUnlock();}
+  }catch(err){
+    console.error("[NoteVault Init Error]",err);
+    var modal=document.getElementById("modalContainer");
+    if(modal){
+      modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:480px;text-align:center;">'+
+        '<h2 style="color:var(--danger)">Startup Notice</h2>'+
+        '<p style="color:var(--text2);font-size:13px;line-height:1.5;">'+
+        'NoteVault encountered an initialization issue: <code>'+escapeHtml(err.message||err)+'</code></p>'+
+        '<div class=modal-actions style="justify-content:center;">'+
+        '<button class=btn onclick="location.reload()">Retry</button>'+
+        '</div></div></div>';
+    }
+  }
+
   document.addEventListener("click",function(e){if(e.button!==0)return;var menu=document.getElementById("contextMenu");
     if(menu&&!menu.contains(e.target))menu.style.display="none";});
   document.getElementById("folderTree").addEventListener("contextmenu",function(e){
