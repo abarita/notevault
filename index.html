@@ -13136,7 +13136,16 @@ async function refreshFolderTree(){
   stats.textContent=totalFolders+" folder"+(totalFolders!==1?"s":"")+" \u00B7 "+totalNotes+" note"+(totalNotes!==1?"s":"");}
 
 function toggleFolder(id){expandedFolders.has(id)?expandedFolders.delete(id):expandedFolders.add(id);refreshFolderTree();}
-function selectFolder(id){currentFolderId=id;currentNoteId=null;document.getElementById("editor").value="";
+function selectFolder(id){currentFolderId=id;
+  try{
+    var folderKey=id?"notevault_folder_note_"+id:"notevault_folder_note___root__";
+    var lastNoteId=safeStorage.getItem(folderKey);
+    if(lastNoteId&&getDecryptedNote(lastNoteId)){
+      loadNote(lastNoteId);
+      return;
+    }
+  }catch(_){}
+  currentNoteId=null;document.getElementById("editor").value="";
   document.getElementById("formatSelect").value="auto";
   document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>\uD83D\uDCC1</div><h2>Folder selected</h2><p>Select a note or create a new one in this folder.</p></div>';
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";refreshFolderTree();}
@@ -13332,6 +13341,10 @@ async function loadNote(id){
     }else if(raw){note=raw;}
   }
   if(!note)return;
+  try{
+    var folderKey=note.folderId?"notevault_folder_note_"+note.folderId:"notevault_folder_note___root__";
+    safeStorage.setItem(folderKey,note.id);
+  }catch(_){}
   document.getElementById("editor").value=note.content;
   document.getElementById("formatSelect").value=note.format;
   currentFolderId=note.folderId;
