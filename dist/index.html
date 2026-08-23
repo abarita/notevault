@@ -12725,6 +12725,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
     <span class="sync-indicator" id="syncIndicator">
       <span class="sync-dot never"></span> <span id="syncLabel">Offline</span>
     </span>
+    <button class="btn-icon" onclick="openSettings()" title="Settings" id="toolbarSettingsBtn">&#9881;</button>
     <button class="btn-icon" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">&#9788;</button>
     <span id="detectedFormat" style="font-size:12px;color:var(--text2);"></span>
   </div>
@@ -12773,6 +12774,26 @@ var safeStorage={
     delete this._mem[k];
   }
 };
+
+function generateUUID(){
+  if(typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"){
+    try{return crypto.randomUUID();}catch(_){}
+  }
+  if(typeof crypto!=="undefined"&&crypto.getRandomValues){
+    try{
+      var buf=new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      buf[6]=(buf[6]&0x0f)|0x40;
+      buf[8]=(buf[8]&0x3f)|0x80;
+      var hex=Array.from(buf).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
+      return hex.slice(0,8)+"-"+hex.slice(8,12)+"-"+hex.slice(12,16)+"-"+hex.slice(16,20)+"-"+hex.slice(20,32);
+    }catch(_){}
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){
+    var r=Math.random()*16|0, v=c==="x"?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
 
 // === STATE ===
 var db=null,currentNoteId=null,currentFolderId=null,saveTimer=null,expandedFolders=new Set();
@@ -13120,7 +13141,7 @@ function selectFolder(id){currentFolderId=id;currentNoteId=null;document.getElem
   document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>\uD83D\uDCC1</div><h2>Folder selected</h2><p>Select a note or create a new one in this folder.</p></div>';
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";refreshFolderTree();}
 
-async function createNoteInFolder(fid){var id=crypto.randomUUID();var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
+async function createNoteInFolder(fid){var id=generateUUID();var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
   await saveNoteRecord(note);if(fid)expandedFolders.add(fid);await refreshFolderTree();loadNote(id);}
 async function createNote(){await createNoteInFolder(currentFolderId);}
 
@@ -13131,7 +13152,7 @@ function createSubfolder(parentId){
     confirmText:"Create",
     onConfirm:async function(name){
       if(!name||!name.trim())return;
-      var id=crypto.randomUUID();
+      var id=generateUUID();
       var folder={id:id,name:name.trim(),parentId:parentId||null,order:0,createdAt:Date.now(),updatedAt:Date.now()};
       await dbPut("folders",folder);
       expandedFolders.add(parentId||"__root__");
@@ -13148,7 +13169,7 @@ function createRootFolder(){
     confirmText:"Create",
     onConfirm:async function(name){
       if(!name||!name.trim())return;
-      var id=crypto.randomUUID();
+      var id=generateUUID();
       var folder={id:id,name:name.trim(),parentId:null,order:0,createdAt:Date.now(),updatedAt:Date.now()};
       await dbPut("folders",folder);
       await refreshFolderTree();
@@ -13567,7 +13588,7 @@ async function doRestoreExistingVault(){
     var recoverySalt="notevault-recovery";
     await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
     var rKey=await deriveKey(wordsInput.join(" "),recoverySalt,100000,true);
-    var salt=crypto.randomUUID();
+    var salt=generateUUID();
     await dbPut("settings",{key:"passphrase_salt",value:salt});
     passphraseKey=await deriveKey(pw,salt);
     recoveryKey=rKey;
@@ -13613,7 +13634,7 @@ async function startSetup(){var pw=document.getElementById("setupPassphrase").va
   var confirm=document.getElementById("setupPassphraseConfirm").value;var err=document.getElementById("setupError");
   if(pw.length<8){err.textContent="Passphrase must be at least 8 characters";err.style.display="";return;}
   if(pw!==confirm){err.textContent="Passphrases do not match";err.style.display="";return;}
-  var salt=crypto.randomUUID();var words=generateRecoveryKey();
+  var salt=generateUUID();var words=generateRecoveryKey();
   await dbPut("settings",{key:"passphrase_salt",value:salt});
   var recoverySalt="notevault-recovery";
   await dbPut("settings",{key:"recovery_salt",value:recoverySalt});
@@ -13787,7 +13808,7 @@ async function setNewPassphrase(){var pw=document.getElementById("newPassphrase"
   var confirm=document.getElementById("newPassphraseConfirm").value;var err=document.getElementById("newPassError");
   if(pw.length<8){err.textContent="Passphrase must be at least 8 characters";err.style.display="";return;}
   if(pw!==confirm){err.textContent="Passphrases do not match";err.style.display="";return;}
-  var salt=crypto.randomUUID();passphraseKey=await deriveKey(pw,salt);
+  var salt=generateUUID();passphraseKey=await deriveKey(pw,salt);
   var wrappedRK=await wrapKey(passphraseKey,recoveryKey);
   await dbPut("settings",{key:"passphrase_salt",value:salt});
   await dbPut("settings",{key:"recovery_key_encrypted",value:JSON.stringify(wrappedRK)});
@@ -13832,7 +13853,7 @@ async function doChangePassphrase(){
     var hash=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(cur+":"+salt.value));
     var hashHex=Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
     if(hashHex!==storedHash.value){err.textContent="Current passphrase is incorrect";err.style.display="";return;}
-    var newSalt=crypto.randomUUID();
+    var newSalt=generateUUID();
     var newKey=await deriveKey(newPw,newSalt);
     var wrappedRK=await wrapKey(newKey,recoveryKey);
     await dbPut("settings",{key:"passphrase_salt",value:newSalt});
@@ -14500,7 +14521,7 @@ async function finishQrPairing(){
     var rKey=await deriveKey(words.join(" "),recoverySalt,100000,true);
     recoveryKey=rKey;
 
-    var salt=crypto.randomUUID();
+    var salt=generateUUID();
     await dbPut("settings",{key:"passphrase_salt",value:salt});
     passphraseKey=await deriveKey(pw,salt);
 
