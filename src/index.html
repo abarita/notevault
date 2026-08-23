@@ -301,13 +301,13 @@ async function renderMermaidDiagrams(){if(typeof mermaid==="undefined")return;in
 function updateMermaidTheme(){if(typeof mermaid!=="undefined"&&mermaidReady){mermaid.initialize({startOnLoad:false,theme:document.documentElement.getAttribute("data-theme")==="dark"?"dark":"default",securityLevel:"loose"});var rendered=document.querySelectorAll(".mermaid-rendered");if(rendered.length>0){var preview=document.getElementById("preview");var content=document.getElementById("editor").value;var fs=document.getElementById("formatSelect").value;var format=fs==="auto"?detectFormat(content):fs;if(format==="markdown"){preview.innerHTML=renderContent(content,format);renderMermaidDiagrams();}}}}
 
 // === DATABASE ===
-function openDB(){return new Promise(function(r,j){var req=indexedDB.open("NoteVaultDB",2);req.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("notes")){var s=d.createObjectStore("notes",{keyPath:"id"});s.createIndex("folderId","folderId",{unique:false});s.createIndex("updatedAt","updatedAt",{unique:false});}else{var ns=e.target.transaction.objectStore("notes");if(!ns.indexNames.contains("folderId"))ns.createIndex("folderId","folderId",{unique:false});if(!ns.indexNames.contains("updatedAt"))ns.createIndex("updatedAt","updatedAt",{unique:false});}if(!d.objectStoreNames.contains("folders")){var s2=d.createObjectStore("folders",{keyPath:"id"});s2.createIndex("parentId","parentId",{unique:false});}if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"key"});};req.onsuccess=function(e){db=e.target.result;r(db);};req.onerror=function(e){j(e.target.error);};});}
-function dbPut(store,val){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).put(val);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
-function dbGet(store,key){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).get(key);req.onsuccess=function(){r(req.result);};req.onerror=function(){r(null);};});}
-function dbGetAll(store){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).getAll();req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
-function dbDelete(store,key){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).delete(key);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
-function dbClear(store){return new Promise(function(r,j){var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).clear();req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};});}
-function dbGetByIndex(store,idx,val){return new Promise(function(r){var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).index(idx).getAll(val);req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};});}
+function openDB(){return new Promise(function(r,j){try{var req=indexedDB.open("NoteVaultDB",2);req.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("notes")){var s=d.createObjectStore("notes",{keyPath:"id"});s.createIndex("folderId","folderId",{unique:false});s.createIndex("updatedAt","updatedAt",{unique:false});}else{var ns=e.target.transaction.objectStore("notes");if(!ns.indexNames.contains("folderId"))ns.createIndex("folderId","folderId",{unique:false});if(!ns.indexNames.contains("updatedAt"))ns.createIndex("updatedAt","updatedAt",{unique:false});}if(!d.objectStoreNames.contains("folders")){var s2=d.createObjectStore("folders",{keyPath:"id"});s2.createIndex("parentId","parentId",{unique:false});}if(!d.objectStoreNames.contains("settings"))d.createObjectStore("settings",{keyPath:"key"});};req.onsuccess=function(e){db=e.target.result;r(db);};req.onerror=function(e){j(e.target.error);};}catch(e){j(e);}});}
+function dbPut(store,val){return new Promise(function(r,j){if(!db){r();return;}try{var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).put(val);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};}catch(e){r();}});}
+function dbGet(store,key){return new Promise(function(r){if(!db){r(null);return;}try{var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).get(key);req.onsuccess=function(){r(req.result);};req.onerror=function(){r(null);};}catch(e){r(null);}});}
+function dbGetAll(store){return new Promise(function(r){if(!db){r([]);return;}try{var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).getAll();req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};}catch(e){r([]);}});}
+function dbDelete(store,key){return new Promise(function(r,j){if(!db){r();return;}try{var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).delete(key);req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};}catch(e){r();}});}
+function dbClear(store){return new Promise(function(r,j){if(!db){r();return;}try{var tx=db.transaction(store,"readwrite");var req=tx.objectStore(store).clear();req.onsuccess=function(){r();};req.onerror=function(e){j(e.target.error);};}catch(e){r();}});}
+function dbGetByIndex(store,idx,val){return new Promise(function(r){if(!db){r([]);return;}try{var tx=db.transaction(store,"readonly");var req=tx.objectStore(store).index(idx).getAll(val);req.onsuccess=function(){r(req.result||[]);};req.onerror=function(){r([]);};}catch(e){r([]);}});}
 
 // === TOMBSTONES / DELETION TRACKING ===
 async function recordTombstone(id, type){
@@ -2076,12 +2076,20 @@ async function triggerPwaInstall(){
 }
 
 // === SETTINGS ===
-async function openSettings(){var modal=document.getElementById("modalContainer");
+async function openSettings(){
+  var modal=document.getElementById("modalContainer");
   var tokSet=!!githubToken;var gidSet=!!gistId;
-  var cGistSetting=await dbGet("settings","cadence_gist_id");
-  var cGistId=cGistSetting?cGistSetting.value:null;
-  modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
+  var cGistId=null;
+  try{
+    if(db){
+      var cGistSetting=await dbGet("settings","cadence_gist_id");
+      cGistId=cGistSetting?cGistSetting.value:null;
+    }
+  }catch(_){}
+
+  modal.innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:520px;max-height:85vh;display:flex;flex-direction:column;">'+
     '<h2>Settings</h2>'+
+    '<div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-right:4px;display:flex;flex-direction:column;gap:2px;">'+
     (deferredInstallPrompt?'<div class=settings-row style="background:var(--surface2);padding:10px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Install App</label><button class="btn btn-sm" onclick="triggerPwaInstall()">📲 Install NoteVault</button></div>':'')+
     '<div class=settings-row style="background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:8px;"><label style="font-weight:600;color:var(--accent);">Pair Mobile Device</label>'+
     '<button class="btn btn-sm" onclick="showPairDeviceModal()">📱 Generate Pairing QR</button></div>'+
@@ -2107,10 +2115,12 @@ async function openSettings(){var modal=document.getElementById("modalContainer"
     '<button class="btn btn-sm btn-ghost" onclick="changePassphrase()">Change</button></div>'+
     '<div class=settings-row><label>User Guide & Mobile Transfer</label>'+
     '<button class="btn btn-sm btn-ghost" onclick="showHelpModal()">View Guide</button></div>'+
-    '<div class=modal-actions>'+
+    '</div>'+
+    '<div class="modal-actions" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">'+
     '<button class="btn btn-ghost btn-danger" onclick="lockVault()" style="margin-right:auto;">Lock Vault</button>'+
     '<button class=btn onclick="closeModal()">Close</button>'+
-    '</div></div></div>';}
+    '</div></div></div>';
+}
 
 function showHelpModal(activeTab){
   activeTab = activeTab || "mobile";
