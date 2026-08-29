@@ -28,9 +28,14 @@
 
 ---
 
-## 📱 Mobile Pairing & Transfer Guide
+### 🌐 Method 0: Live Production Portal (Easiest — Direct Web Access)
 
-Because NoteVault compiles into a single, self-contained `index.html` file, you can easily transfer and run it on your smartphone.
+NoteVault is deployed and hosted live as part of the **Bilingual Learning Suite Hub**:
+* **Live App**: [https://hub-lime-beta.vercel.app/note-vault.html](https://hub-lime-beta.vercel.app/note-vault.html)
+* **Suite Portal**: [https://hub-lime-beta.vercel.app/](https://hub-lime-beta.vercel.app/)
+* Open in mobile Safari or Chrome and tap **"Add to Home Screen" / "Install App"** for 100% offline access.
+
+---
 
 ### ⭐ Method 1: 1-Tap QR Code Pairing (Air-Gapped & Instant)
 

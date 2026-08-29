@@ -1,4 +1,4 @@
-var CACHE_NAME="notevault-v2";
+var CACHE_NAME="notevault-v3-live";
 var CACHE_URLS=[
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ var CACHE_URLS=[
 ];
 
 self.addEventListener("install",function(e){
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache){
       return Promise.all(CACHE_URLS.map(function(url){
@@ -15,7 +16,7 @@ self.addEventListener("install",function(e){
           console.warn("SW: failed to cache",url,err);
         });
       }));
-    }).then(function(){return self.skipWaiting();})
+    })
   );
 });
 
@@ -27,20 +28,22 @@ self.addEventListener("activate",function(e){
   );
 });
 
+// Network-First with Cache Fallback for always fresh updates
 self.addEventListener("fetch",function(e){
   if(e.request.method!=="GET")return;
+  var url = new URL(e.request.url);
+  if(!url.protocol.startsWith("http"))return;
+
   e.respondWith(
-    caches.match(e.request).then(function(cached){
-      if(cached)return cached;
-      return fetch(e.request).then(function(response){
-        if(!response||(response.status!==200&&response.type!=="opaque")){
-          return response;
-        }
+    fetch(e.request).then(function(response){
+      if(response && response.status===200){
         var clone=response.clone();
         caches.open(CACHE_NAME).then(function(cache){cache.put(e.request,clone);});
-        return response;
-      }).catch(function(){
-        return caches.match("./index.html");
+      }
+      return response;
+    }).catch(function(){
+      return caches.match(e.request).then(function(cached){
+        return cached || caches.match("./index.html");
       });
     })
   );
