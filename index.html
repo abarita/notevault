@@ -12709,7 +12709,10 @@ body {
 
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <h1>NoteVault</h1>
+    <a href="index.html" title="Return to Learning Suite Hub" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:6px;">
+      <span style="font-size:16px;">🏠</span>
+      <h1>NoteVault</h1>
+    </a>
     <div style="display:flex;gap:4px;">
       <button class="btn-icon" onclick="showHelpModal()" title="Help & User Guide" id="helpBtn">?</button>
       <button class="btn-icon" onclick="lockVault()" title="Lock Vault" id="lockBtn">&#128274;</button>
@@ -12729,6 +12732,7 @@ body {
 <div class="main">
   <div class="toolbar">
     <button class="hamburger" onclick="toggleSidebar()" title="Menu">&#9776;</button>
+    <a href="index.html" class="btn btn-sm btn-ghost" title="Return to Learning Suite Hub" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:4px 8px;font-size:12px;">🏠 Hub</a>
     <select id="formatSelect" onchange="onFormatChange()">
       <option value="auto">Auto-detect</option>
       <option value="text">Plain Text</option>
