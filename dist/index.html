@@ -12549,9 +12549,22 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.sidebar { width: 300px; min-width: 180px; max-width: 600px; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border); z-index: 10; transition: transform 0.25s ease; flex-shrink: 0; position: relative; }
-.sidebar-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.sidebar-header h1 { font-size: 17px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.sidebar { width: 300px; min-width: 220px; max-width: 600px; background: var(--surface); display: flex; flex-direction: column; border-right: 1px solid var(--border); z-index: 10; transition: transform 0.25s ease; flex-shrink: 0; position: relative; overflow: hidden; }
+.sidebar-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-shrink: 0; }
+.sidebar-header h1 { font-size: 16px; font-weight: 700; color: var(--accent); white-space: nowrap; margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.sidebar-toolbar { padding: 8px 12px; display: flex; gap: 6px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.sidebar-search-wrap { padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface); }
+.search-box { position: relative; display: flex; align-items: center; width: 100%; }
+.search-box-icon { position: absolute; left: 10px; color: var(--text3); font-size: 13px; pointer-events: none; }
+.search-box .search-input { width: 100% !important; box-sizing: border-box; padding-left: 30px; padding-right: 26px; }
+.search-clear-btn { position: absolute; right: 6px; background: none; border: none; color: var(--text3); font-size: 14px; cursor: pointer; padding: 2px 4px; display: none; line-height: 1; border-radius: 4px; }
+.search-clear-btn:hover { color: var(--text); background: var(--surface2); }
+.sidebar-locked-card { margin: 16px 12px; padding: 16px 14px; background: var(--surface2); border: 1px dashed var(--border); border-radius: 10px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.sidebar-locked-card .locked-icon { font-size: 32px; opacity: 0.8; }
+.sidebar-locked-card h3 { font-size: 14px; margin: 0; color: var(--text); font-weight: 600; }
+.sidebar-locked-card p { font-size: 12px; color: var(--text2); margin: 0; line-height: 1.45; }
+.sidebar-empty-tree { padding: 24px 16px; text-align: center; color: var(--text2); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sidebar-empty-tree .empty-icon { font-size: 32px; opacity: 0.5; }
 .btn { background: var(--accent); color: var(--bg); border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; white-space: nowrap; min-height: 36px; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
 .btn:hover { opacity: 0.85; }
 .btn:active { opacity: 0.7; }
@@ -12709,17 +12722,23 @@ body {
 
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <h1>NoteVault</h1>
-    <div style="display:flex;gap:4px;">
+    <h1><span>🔐</span> NoteVault</h1>
+    <div style="display:flex;gap:4px;align-items:center;">
       <button class="btn-icon" onclick="showHelpModal()" title="Help & User Guide" id="helpBtn">?</button>
-      <button class="btn-icon" onclick="lockVault()" title="Lock Vault" id="lockBtn">&#128274;</button>
+      <button class="btn-icon" onclick="handleLockClick()" title="Lock / Unlock Vault" id="lockBtn">&#128274;</button>
       <button class="btn-icon" onclick="openSettings()" title="Settings">&#9881;</button>
-      <button class="btn btn-sm btn-ghost" onclick="createRootFolder()" title="New folder">&#128193;+</button>
-      <button class="btn btn-sm" onclick="createNote()">+ New</button>
     </div>
   </div>
-  <div style="padding:6px 8px;">
-    <input class="search-input" id="searchInput" placeholder="Search..." oninput="onSearch()" style="width:100%;">
+  <div class="sidebar-toolbar">
+    <button class="btn btn-sm" onclick="createNote()" style="flex:1;justify-content:center;" title="Create new note (Ctrl+N)">+ New Note</button>
+    <button class="btn btn-sm btn-ghost" onclick="createRootFolder()" title="New root folder (Ctrl+Shift+F)">&#128193;+ Folder</button>
+  </div>
+  <div class="sidebar-search-wrap">
+    <div class="search-box">
+      <span class="search-box-icon">&#128269;</span>
+      <input class="search-input" id="searchInput" placeholder="Search notes (Ctrl+K)..." oninput="onSearch()">
+      <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" title="Clear search">&times;</button>
+    </div>
   </div>
   <div class="folder-tree" id="folderTree" ondragover="dragOver(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" ondrop="dropNote(event,null)"></div>
   <div class="stats" id="stats">0 notes</div>
@@ -13045,7 +13064,37 @@ function updatePreview(){var content=document.getElementById("editor").value;var
   if(actualFormat==="markdown")renderMermaidDiagrams();
   document.getElementById("charCount").textContent=content.length+" chars";}
 
-function onEditorInput(){updatePreview();if(currentNoteId)scheduleSave();}
+function onEditorInput(){
+  updatePreview();
+  var content = document.getElementById("editor").value;
+  if(!currentNoteId && content.trim().length > 0){
+    if(isLocked){
+      handleLockClick();
+      return;
+    }
+    // Auto-create note to prevent data loss
+    var id = generateUUID();
+    var firstLine = content.split("\n")[0].replace(/^#+\s*/,"").trim().substring(0,80) || "Untitled Note";
+    var fs = document.getElementById("formatSelect").value;
+    var note = {
+      id: id,
+      folderId: currentFolderId || null,
+      title: firstLine,
+      content: content,
+      format: fs || "auto",
+      customTitle: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    currentNoteId = id;
+    saveNoteRecord(note).then(function(){
+      refreshFolderTree();
+      scheduleSave();
+    });
+    return;
+  }
+  if(currentNoteId)scheduleSave();
+}
 function onFormatChange(){updatePreview();if(currentNoteId)scheduleSave();}
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveCurrentNote,500);scheduleAutoSync();}
 
@@ -13119,13 +13168,40 @@ function showConfirmModal(options){
 
 // === FOLDER TREE ===
 async function refreshFolderTree(){
-  if(isLocked)return;
+  var tree=document.getElementById("folderTree");
+  var stats=document.getElementById("stats");
+  updateLockBtn();
+  if(!tree)return;
+
+  if(isLocked){
+    var setupDone = await isSetup();
+    tree.innerHTML = '<div class="sidebar-locked-card">'+
+      '<div class="locked-icon">🔒</div>'+
+      '<h3>Vault is Locked</h3>'+
+      '<p>'+(setupDone ? 'Unlock NoteVault to view and edit your encrypted notes.' : 'Set up your passphrase to encrypt your notes.')+'</p>'+
+      '<button class="btn btn-sm" onclick="handleLockClick()" style="margin-top:4px;">'+(setupDone ? 'Unlock Vault' : 'Set Up Vault')+'</button>'+
+      '</div>';
+    if(stats)stats.textContent = "Vault locked";
+    return;
+  }
+
   var folders=await dbGetAll("folders");
   var notes=getAllDecryptedNotes();
-  var tree=document.getElementById("folderTree");var stats=document.getElementById("stats");
   var q=searchQuery.toLowerCase();
   var filteredNotes=q?notes.filter(function(n){return (n.title||"").toLowerCase().includes(q)||(n.content||"").toLowerCase().includes(q);}):notes;
   var noteCounts={};notes.forEach(function(n){var fid=n.folderId||"__root__";noteCounts[fid]=(noteCounts[fid]||0)+1;});
+
+  if(notes.length===0 && folders.length===0){
+    tree.innerHTML = '<div class="sidebar-empty-tree">'+
+      '<div class="empty-icon">📝</div>'+
+      '<div style="font-weight:600;color:var(--text);">No notes yet</div>'+
+      '<div style="font-size:12px;line-height:1.4;">Click "+ New Note" or start typing in the editor.</div>'+
+      '<button class="btn btn-sm" onclick="createNote()" style="margin-top:6px;">+ Create First Note</button>'+
+      '</div>';
+    if(stats)stats.textContent = "0 notes";
+    return;
+  }
+
   function buildTree(parentId,level){parentId=parentId||null;level=level||0;var children=folders.filter(function(f){return f.parentId===parentId;});
     var folderNotes=filteredNotes.filter(function(n){return (n.folderId||null)===parentId;});
     var html="";
@@ -13157,7 +13233,7 @@ async function refreshFolderTree(){
     return html;}
   tree.innerHTML=buildTree();
   var totalNotes=notes.length;var totalFolders=folders.length;
-  stats.textContent=totalFolders+" folder"+(totalFolders!==1?"s":"")+" \u00B7 "+totalNotes+" note"+(totalNotes!==1?"s":"");}
+  if(stats)stats.textContent=totalFolders+" folder"+(totalFolders!==1?"s":"")+" \u00B7 "+totalNotes+" note"+(totalNotes!==1?"s":"");}
 
 function toggleFolder(id){expandedFolders.has(id)?expandedFolders.delete(id):expandedFolders.add(id);refreshFolderTree();}
 function selectFolder(id){currentFolderId=id;
@@ -13174,11 +13250,27 @@ function selectFolder(id){currentFolderId=id;
   document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>\uD83D\uDCC1</div><h2>Folder selected</h2><p>Select a note or create a new one in this folder.</p></div>';
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";refreshFolderTree();}
 
-async function createNoteInFolder(fid){var id=generateUUID();var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
-  await saveNoteRecord(note);if(fid)expandedFolders.add(fid);await refreshFolderTree();loadNote(id);}
+async function createNoteInFolder(fid){
+  if(isLocked){
+    showToast("Please unlock NoteVault first", true);
+    handleLockClick();
+    return;
+  }
+  var id=generateUUID();
+  var note={id:id,folderId:fid||null,title:"Untitled",content:"",format:"auto",createdAt:Date.now(),updatedAt:Date.now()};
+  await saveNoteRecord(note);
+  if(fid)expandedFolders.add(fid);
+  await refreshFolderTree();
+  loadNote(id);
+}
 async function createNote(){await createNoteInFolder(currentFolderId);}
 
 function createSubfolder(parentId){
+  if(isLocked){
+    showToast("Please unlock NoteVault first", true);
+    handleLockClick();
+    return;
+  }
   showPromptModal({
     title:"New Subfolder",
     placeholder:"Folder name",
@@ -13196,6 +13288,11 @@ function createSubfolder(parentId){
 }
 
 function createRootFolder(){
+  if(isLocked){
+    showToast("Please unlock NoteVault first", true);
+    handleLockClick();
+    return;
+  }
   showPromptModal({
     title:"New Root Folder",
     placeholder:"Folder name",
@@ -13478,7 +13575,22 @@ function clearEditor(){document.getElementById("editor").value="";document.getEl
   document.getElementById("preview").innerHTML='<div class=empty-state><div class=empty-state-icon>&#128221;</div><h2>No note selected</h2><p>Create a new note or select one from the sidebar.</p></div>';
   document.getElementById("detectedFormat").textContent="";document.getElementById("charCount").textContent="0 chars";}
 
-function onSearch(){searchQuery=document.getElementById("searchInput").value;refreshFolderTree();}
+function onSearch(){
+  var el=document.getElementById("searchInput");
+  searchQuery=el?el.value:"";
+  var clearBtn=document.getElementById("searchClearBtn");
+  if(clearBtn)clearBtn.style.display=searchQuery?"block":"none";
+  refreshFolderTree();
+}
+
+function clearSearch(){
+  var el=document.getElementById("searchInput");
+  if(el){el.value="";el.focus();}
+  searchQuery="";
+  var clearBtn=document.getElementById("searchClearBtn");
+  if(clearBtn)clearBtn.style.display="none";
+  refreshFolderTree();
+}
 
 // === THEME ===
 function toggleTheme(){var html=document.documentElement;var current=html.getAttribute("data-theme");
@@ -13535,7 +13647,34 @@ function generateRecoveryKey(){var words=[];var arr=new Uint16Array(12);crypto.g
 async function deriveRecoveryKey(words){var s=await dbGet("settings","recovery_salt");var salt=s?s.value:"notevault-recovery";
   return deriveKey(words.join(" "),salt,100000,true);}
 
-// === LOCK VAULT ===
+// === LOCK / UNLOCK CONTROLS ===
+function updateLockBtn(){
+  var btn=document.getElementById("lockBtn");
+  if(!btn)return;
+  if(isLocked){
+    btn.innerHTML="&#128274;";
+    btn.title="Vault is locked (Click to unlock)";
+    btn.style.color="var(--warning)";
+  }else{
+    btn.innerHTML="&#128275;";
+    btn.title="Vault is unlocked (Click to lock)";
+    btn.style.color="var(--accent)";
+  }
+}
+
+async function handleLockClick(){
+  if(isLocked){
+    var setupDone=await isSetup();
+    if(!setupDone){
+      await showSetup();
+    }else{
+      await showUnlock();
+    }
+  }else{
+    lockVault();
+  }
+}
+
 function lockVault(){
   if(isLocked)return;
   isLocked=true;
@@ -13544,10 +13683,50 @@ function lockVault(){
   githubToken=null;
   decryptedNotesCache.clear();
   clearEditor();
-  document.getElementById("folderTree").innerHTML="";
-  document.getElementById("stats").textContent="Vault locked";
+  updateLockBtn();
+  refreshFolderTree();
   showUnlock();
   showToast("Vault locked");
+}
+
+async function ensureWelcomeNote(){
+  try{
+    if(isLocked||!db)return;
+    var notes=await dbGetAll("notes");
+    if(notes.length===0 && decryptedNotesCache.size===0){
+      var id=generateUUID();
+      var welcomeContent="# Welcome to NoteVault 🔐\n\n"+
+        "Your private, offline-first notes vault is ready! Everything you type is encrypted at rest using **AES-256-GCM** envelope encryption.\n\n"+
+        "### 💡 Quick Tips\n"+
+        "- **New Note**: Press `Ctrl+N` (or tap `+ New Note` in the sidebar).\n"+
+        "- **New Folder**: Press `Ctrl+Shift+F` (or tap `📁+ Folder`).\n"+
+        "- **Search**: Press `Ctrl+K` to search notes and contents instantly.\n"+
+        "- **Auto-Save**: Edits save automatically as you type.\n\n"+
+        "### 📊 Supported Formats\n"+
+        "NoteVault automatically detects:\n"+
+        "1. **Markdown** (GFM tables, task lists, code fences)\n"+
+        "2. **JSON** (Interactive collapsible tree with filtering)\n"+
+        "3. **XML** (Syntax highlighted)\n"+
+        "4. **Mermaid Diagrams** (Flowcharts and sequence graphs)\n\n"+
+        "```mermaid\ngraph LR\n  A[Write Notes] --> B[AES-256 Encrypt]\n  B --> C[Local IndexedDB]\n  B --> D[Private GitHub Gist]\n```\n\n"+
+        "Click the **⚙️ Settings** icon in the sidebar anytime to set up cross-device cloud sync via GitHub Gist or generate an air-gapped QR pairing code.";
+      var welcomeNote={
+        id:id,
+        folderId:null,
+        title:"Welcome to NoteVault 🔐",
+        content:welcomeContent,
+        format:"markdown",
+        customTitle:true,
+        createdAt:Date.now(),
+        updatedAt:Date.now()
+      };
+      await saveNoteRecord(welcomeNote);
+      await refreshFolderTree();
+      await loadNote(id);
+    }
+  }catch(e){
+    console.warn("Welcome note seed error:", e);
+  }
 }
 
 // === SETUP / UNLOCK / RECOVERY ===
@@ -13709,18 +13888,39 @@ function verifyRecoveryWords(){var modal=document.getElementById("modalContainer
     '<button class=btn onclick="doVerifyRecovery()">Verify</button>'+
     '</div></div></div>';}
 
-async function skipVerify(){await dbPut("settings",{key:"setup_complete",value:true});
-  closeModal();isLocked=false;await loadAllNotesDecrypted();await refreshFolderTree();updatePreview();showToast("Setup complete!");}
+async function skipVerify(){
+  await dbPut("settings",{key:"setup_complete",value:true});
+  closeModal();
+  isLocked=false;
+  await loadAllNotesDecrypted();
+  await ensureWelcomeNote();
+  await refreshFolderTree();
+  updatePreview();
+  showToast("Setup complete!");
+}
 
-async function doVerifyRecovery(){var input=document.getElementById("verifyWords").value.trim().split(/\s+/);var err=document.getElementById("verifyError");
+async function doVerifyRecovery(){
+  var input=document.getElementById("verifyWords").value.trim().split(/\s+/);
+  var err=document.getElementById("verifyError");
   if(input.length!==12){err.textContent="Please enter exactly 12 words";err.style.display="";return;}
-  try{var testKey=await deriveRecoveryKey(input);var verifyEnc=await dbGet("settings","recovery_verify");
+  try{
+    var testKey=await deriveRecoveryKey(input);
+    var verifyEnc=await dbGet("settings","recovery_verify");
     var decrypted=await decryptAESString(testKey,verifyEnc.value);
     if(decrypted!=="notevault-verify"){err.textContent="Words do not match.";err.style.display="";return;}
     await dbPut("settings",{key:"setup_complete",value:true});
-    closeModal();isLocked=false;recoveryKey=testKey;
-    await loadAllNotesDecrypted();await refreshFolderTree();updatePreview();showToast("Setup complete!");
-  }catch(e){err.textContent="Words do not match: "+e.message;err.style.display="";}}
+    closeModal();
+    isLocked=false;
+    recoveryKey=testKey;
+    await loadAllNotesDecrypted();
+    await ensureWelcomeNote();
+    await refreshFolderTree();
+    updatePreview();
+    showToast("Setup complete!");
+  }catch(e){
+    err.textContent="Words do not match: "+e.message;err.style.display="";
+  }
+}
 
 async function showUnlock(){var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class=modal-overlay><div class=modal style="max-width:520px;">'+
@@ -13753,6 +13953,7 @@ async function doUnlock(){var pw=document.getElementById("unlockPassphrase").val
     var se=await dbGet("settings","auto_sync");if(se)syncEnabled=se.value;
     closeModal();isLocked=false;
     await loadAllNotesDecrypted();
+    await ensureWelcomeNote();
     await refreshFolderTree();updatePreview();updateSyncIndicator();showToast("Unlocked");
     await restoreLastOpenedNote();
   }catch(e){err.textContent="Error unlocking: "+e.message;err.style.display="";}}
@@ -15177,6 +15378,8 @@ async function init(){
     initResizers();
     initSyncScroll();
     applyMobileView();
+    updateLockBtn();
+    await refreshFolderTree();
     var autoSync=await dbGet("settings","auto_sync");if(autoSync)syncEnabled=autoSync.value;
     if('caches' in window){
       try{
