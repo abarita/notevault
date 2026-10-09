@@ -184,11 +184,12 @@ body {
 .hamburger { display: none; background: none; border: none; color: var(--text); cursor: pointer; font-size: 22px; padding: 4px 8px; border-radius: 6px; min-height: 40px; min-width: 40px; align-items: center; justify-content: center; }
 .hamburger:hover { background: var(--surface2); }
 .modal-overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.modal { background: var(--surface); border-radius: 14px; padding: 24px; max-width: 480px; width: 100%; box-shadow: var(--shadow); border: 1px solid var(--border); animation: modalPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal { box-sizing: border-box; background: var(--surface); border-radius: 14px; padding: 24px; max-width: 480px; width: 100%; box-shadow: var(--shadow); border: 1px solid var(--border); animation: modalPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal, .modal * { box-sizing: border-box; }
 @keyframes modalPopIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .modal h2 { font-size: 18px; margin-bottom: 12px; color: var(--accent); }
 .modal p { font-size: 14px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
-.modal input[type="text"], .modal input[type="password"], .modal textarea { width: 100%; padding: 10px 14px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+.modal input[type="text"], .modal input[type="password"], .modal textarea { width: 100%; box-sizing: border-box; padding: 10px 14px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
 .modal input[type="password"] { letter-spacing: 0.08em; }
 .modal input[type="password"]::placeholder { letter-spacing: normal; }
 .modal textarea { font-family: 'Cascadia Code','Fira Code','Consolas',monospace; }
