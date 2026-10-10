@@ -2068,10 +2068,13 @@ async function showPairDeviceModal(){
 function showQrScannerModal(){
   var modal=document.getElementById("modalContainer");
   modal.innerHTML='<div class="modal-overlay">'+
-    '<div class="modal" style="max-width:480px;text-align:center;">'+
-    '<h2>📷 Scan Pairing QR Code</h2>'+
-    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">'+
-    'Point your camera at the NoteVault QR code on your PC screen, or snap a photo.'+
+    '<div class="modal" id="qrModalCard" style="max-width:480px;text-align:center;" ondragover="event.preventDefault();this.style.borderColor=\'var(--accent)\';" ondragleave="this.style.borderColor=\'var(--border)\';" ondrop="event.preventDefault();this.style.borderColor=\'var(--border)\';if(event.dataTransfer&&event.dataTransfer.files&&event.dataTransfer.files[0])processQrFile(event.dataTransfer.files[0]);">'+
+    '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">'+
+    '<span style="font-size:24px;">📷</span>'+
+    '<h2 style="margin:0;font-size:19px;font-weight:700;">Pair Device via QR Code</h2>'+
+    '</div>'+
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.45;">'+
+    'Scan with webcam, upload an image file, or press <kbd style="background:var(--surface2);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-size:11px;font-family:inherit;">Ctrl+V</kbd> to paste a screenshot.'+
     '</p>'+
     '<div id="qrVideoContainer" style="position:relative;width:100%;max-width:320px;height:240px;margin:0 auto 12px;background:#000;border-radius:10px;overflow:hidden;border:2px solid var(--accent);">'+
     '<video id="qrVideo" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;"></video>'+
@@ -2081,29 +2084,31 @@ function showQrScannerModal(){
     '<div id="qrFallbackContainer" style="display:none;background:var(--surface2);padding:20px 16px;border-radius:10px;border:2px dashed var(--accent);margin:0 auto 14px;max-width:360px;">'+
     '<div style="font-size:32px;margin-bottom:6px;">📸</div>'+
     '<div style="font-weight:600;font-size:14px;margin-bottom:4px;">Snap or Upload QR Code</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.4;">Live camera stream is unavailable. You can take a photo of your PC monitor directly:</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.4;">Live camera stream is unavailable. You can upload or paste an image of your QR code directly:</div>'+
     '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'+
     '<label class="btn" style="cursor:pointer;padding:8px 16px;font-size:13px;">'+
-    '📸 Take Photo of Screen <input type="file" accept="image/*" capture="environment" onchange="handleQrFileUpload(event)" style="display:none;">'+
+    '📁 Choose QR File <input type="file" accept="image/*" onchange="handleQrFileUpload(event)" style="display:none;">'+
     '</label>'+
     '<label class="btn btn-ghost" style="cursor:pointer;padding:8px 14px;font-size:13px;">'+
-    '📁 Gallery <input type="file" accept="image/*" onchange="handleQrFileUpload(event)" style="display:none;">'+
+    '📸 Camera <input type="file" accept="image/*" capture="environment" onchange="handleQrFileUpload(event)" style="display:none;">'+
     '</label>'+
     '</div>'+
     '</div>'+
     '<div id="qrScanStatus" style="font-size:12px;color:var(--text2);margin-bottom:14px;">Initializing camera...</div>'+
     '<div id="qrBottomButtons" style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap;">'+
-    '<label class="btn btn-sm" style="cursor:pointer;background:var(--surface3);">'+
-    '📸 Snap QR Photo <input type="file" accept="image/*" capture="environment" id="qrCaptureInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
+    '<label class="btn btn-sm" style="cursor:pointer;background:var(--accent);color:var(--bg);font-weight:600;">'+
+    '📁 Upload QR Image <input type="file" accept="image/*" id="qrFileInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
     '</label>'+
     '<label class="btn btn-sm btn-ghost" style="cursor:pointer;">'+
-    '📁 Choose Image <input type="file" accept="image/*" id="qrFileInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
+    '📸 Snap with Camera <input type="file" accept="image/*" capture="environment" id="qrCaptureInput" style="display:none;" onchange="handleQrFileUpload(event)">'+
     '</label>'+
     '</div>'+
-    '<div class="modal-actions" style="justify-content:center;">'+
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:12px;">💡 Drag &amp; drop an image here, or press Ctrl+V to paste</div>'+
+    '<div class="modal-actions" style="justify-content:center;margin-top:0;">'+
     '<button class="btn btn-ghost" onclick="stopQrScannerAndClose()">Cancel</button>'+
     '</div></div></div>';
 
+  window.addEventListener("paste", handleQrPasteEvent);
   startQrScanner();
 }
 
@@ -2146,6 +2151,7 @@ async function startQrScanner(){
 }
 
 function stopQrScanner(){
+  window.removeEventListener("paste", handleQrPasteEvent);
   if(qrScannerAnimId){
     cancelAnimationFrame(qrScannerAnimId);
     qrScannerAnimId=null;
@@ -2202,8 +2208,24 @@ async function scanQrFrameLoop(){
   qrScannerAnimId=requestAnimationFrame(scanQrFrameLoop);
 }
 
+function handleQrPasteEvent(e){
+  if(!e.clipboardData)return;
+  var items=e.clipboardData.items;
+  if(!items)return;
+  for(var i=0;i<items.length;i++){
+    if(items[i].type.indexOf("image")!==-1){
+      var f=items[i].getAsFile();
+      if(f){processQrFile(f);break;}
+    }
+  }
+}
+
 function handleQrFileUpload(event){
   var file=event.target.files&&event.target.files[0];
+  if(file)processQrFile(file);
+}
+
+function processQrFile(file){
   if(!file)return;
   var status=document.getElementById("qrScanStatus");
   if(status)status.textContent="Processing QR image...";
@@ -2255,7 +2277,7 @@ function handleQrFileUpload(event){
       if(foundCode){
         processScannedQrData(foundCode);
       }else{
-        if(status)status.textContent="❌ No NoteVault QR code detected. Please ensure the QR code on your PC monitor is in focus and try taking the photo again.";
+        if(status)status.textContent="❌ No NoteVault QR code detected. Please ensure the QR code image is clear and in focus.";
       }
     };
     img.src=e.target.result;
